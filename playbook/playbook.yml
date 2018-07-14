@@ -1,0 +1,84 @@
+---
+
+- name: Provision sit-inbox
+  hosts: 127.0.0.1
+  connection: local
+  become: yes
+  roles:
+          - common
+  tasks:
+          - name: start dovecot
+            command: "bash -c 'dovecot || dovecot reload'"
+          - name: prepare mailbox users
+            user:
+                    name: "mb_{{ item.key }}"
+                    password: "$6$P0SvmyMSldk$.FTEdn/rBtDYuN4dWMGpICoLtQSJCltyjMpwk9AqwPIbPZJvxlI/CTdPTD4p5VnpR2kH.i6AOhtzqKvkP2B.7/"
+                    home: "{{ item.value.path }}"
+            loop: "{{ inbox | dict2items }}"
+            when: item.value.type == "email" and item.value.retriever == "MailboxRetriever"
+          - name: .getmail directory 
+            file:
+                  path: /root/.getmail
+                  state: directory
+                  mode: 0700
+          - name: configure getmail
+            template:
+                  src: templates/getmailrc.j2
+                  dest: "/root/.getmail/{{ item.key }}"
+            loop: "{{ inbox | dict2items }}"
+            when: item.value.type == "email"
+          - name: getmail scripts
+            template:
+                  src: templates/getmail.j2
+                  dest: "/usr/bin/getmail.{{ item.key }}"
+                  mode: 0700
+            loop: "{{ inbox | dict2items }}"
+            when: item.value.type == "email"
+          - name: getmail on start
+            cron:
+                    name: "get email for {{ item.key }} at startup"
+                    special_time: reboot
+                    job: "getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key }}"
+            loop: "{{ inbox | dict2items }}"
+            when: item.value.type == "email" and (item.value.autostart | default(true))
+          - name: check-email script
+            template:
+                    src: templates/check-email.j2
+                    dest: "/usr/bin/check-email"
+                    mode: 0777
+          - name: configure maildrop
+            template:
+                    src: templates/maildrop.j2
+                    dest: "/root/.getmail/maildrop.{{ item.key }}"
+                    mode: 0600
+            loop: "{{ inbox | dict2items }}"
+            when: item.value.type == "email"
+          - name: clone git repositories
+            git:
+                    dest: "/var/lib/repositories/{{ item.key }}"
+                    repo: "{{ item.value.source }}"
+            loop: "{{ repository | dict2items }}"
+            when: item.value.type == "git"
+          - name: configure git repository username
+            git_config:
+                    name: user.name
+                    value: "{{ item.value.git_username | default('sit-inbox') }}"
+                    scope: local
+                    repo: "/var/lib/repositories/{{ item.key }}"
+            loop: "{{ repository | dict2items }}"
+            when: item.value.type == "git"
+          - name: configure git repository email
+            git_config:
+                    name: user.email
+                    value: "{{ item.value.git_email | default('inbox@sit') }}"
+                    scope: local
+                    repo: "/var/lib/repositories/{{ item.key }}"
+            loop: "{{ repository | dict2items }}"
+            when: item.value.type == "git"
+          - name: git ingress
+            template:
+                    src: templates/git_email.j2
+                    dest: "/usr/bin/email.{{ item.key }}"
+                    mode: 0700
+            loop: "{{ repository | dict2items }}"
+            when: item.value.type == "git"

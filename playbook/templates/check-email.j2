@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+{% for item in (inbox | dict2items) -%}
+{% if item.value.type == "email" -%}
+getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key}}
+{% endif -%}
+{% endfor -%}

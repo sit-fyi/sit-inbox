@@ -1,0 +1,79 @@
+#! /usr/bin/env bash
+email_reponse=${EMAIL_RESPONSE:-{{ item.value.email_response | default('') }}}
+file=$(mktemp)
+cat <&0 > "${file}"
+temp=$(mktemp -d)
+
+cd "/var/lib/repositories/{{ item.key }}"
+
+git pull -f -q 2>/dev/null
+
+original="${temp}/original"
+git clone -q "/var/lib/repositories/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
+
+git branch -q -D inbox 2>/dev/null >/dev/null
+git checkout -b inbox 2>/dev/null
+
+cat ${file} | reformail -X Date: -X From: -X Subject: | \
+        logger -s -t "git.{{ item.key }}" 
+git_am=$(git am -s -3 "${file}" 2>&1)
+result=$?
+
+if [ "${result}" == "0" ]; then
+        files=$(git diff --name-only origin/{{ item.value.branch | default('master') }} inbox)
+        # Figure out if we're using .sit/items or deprecated .sit/issues
+       if [ -d "/.sit/issues" ]; then
+                target=issue
+                target_dir=.sit/issues
+        else
+                target=item
+                target_dir=.sit/items
+        fi
+        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+        outside_files=
+        for file in ${files}; do
+                if [ "${file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                        outside_files="${outside_files}${file} is outside of ${target_dir}\n"
+                        continue
+                fi
+
+                item=$(echo "${file}" | cut -d'/' -f 3)
+                record=$(echo "${file}" | cut -d'/' -f 4)
+                record_path=$(echo "${file}" | cut -d'/' -f 1-4)
+
+                if [ -f "${original}/${file}" ]; then
+                        outside_files="${outside_files}File ${file} already exists in the target repository\n"
+                        continue
+                fi
+
+                if [ -d "${original}/${record_path}" ]; then
+                        if ! [[ "${outside_files}" =~ "Record ${item}/${record} already exists in the target repository" ]]; then
+                                outside_files="${outside_files}Record ${item}/${record} already exists in the target repository\n"
+                        fi
+                        continue
+                fi
+
+        done
+        if [ "${outside_files}" == "" ]; then
+                git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
+                logger -s -t "git.{{ item.key }}" "Patch applied and pushed"
+        else
+                logger -s -t "git.{{ item.key }}" "Patch rejected"
+                printf "${outside_files}" | logger -s -t "git.{{ item.key }}"
+        fi
+else
+        if [[ "${git_am}" =~ "Patch is empty" ]]; then
+                logger -s -t "git.{{ item.key }}" "No patch found, skipping"
+        else
+                logger -s -t "git.{{ item.key }}" "Applying patch failed ${git_am}"
+        fi
+        git am --abort 2>/dev/null
+fi
+
+
+git checkout "{{ item.value.branch | default('master') }}" 1>/dev/null 2>/dev/null
+git branch -q -D inbox 1>/dev/null 2>/dev/null
+
+rm -rf "${temp}"
+rm -f "${file}"
+

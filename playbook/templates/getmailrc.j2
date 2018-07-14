@@ -1,0 +1,27 @@
+[retriever]
+{% if item.value.retriever == 'MailboxRetriever' -%}
+type = SimpleIMAPRetriever
+server = 127.0.0.1
+username = mb_{{ item.key }}
+password = 
+use_peek = false
+{% else -%}
+type = {{ item.value.retriever | mandatory }}
+server = {{ item.value.server | mandatory }}
+username = {{ item.value.username | mandatory }}
+{% if item.value.port is defined -%}
+port = {{ item.value.port }}
+{% endif -%}
+{% if item.value.password is defined -%}
+password = {{ item.value.password }}
+{% endif -%}
+{% if item.value.password_command is defined -%}
+password_command = {{ item.value.password_command | to_json | regex_replace("^\[", "(") | regex_replace("\]$", ")")}}
+{% endif -%}
+{% endif -%}
+
+[destination]
+type = MDA_external
+path = /usr/local/bin/maildrop
+arguments = ( "-f", "%(sender)", "/root/.getmail/maildrop.{{ item.key }}", )
+allow_root_commands = true

@@ -1,0 +1,17 @@
+[repository.repo]
+type = "git"
+source = "/repo.test"
+
+[inbox.email]
+type = "email"
+retriever = "MailboxRetriever"
+path = "/inbox"
+default_repository = "repo"
+
+[inbox.mbox]
+type = "email"
+retriever = "MailboxRetriever"
+path = "/mbox"
+maildrop = """
+to /root/mbox
+"""

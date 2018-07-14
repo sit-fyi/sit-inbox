@@ -1,0 +1,119 @@
+$id: https://sit.fyi/sit-inbox/config.schema.json
+$schema: http://json-schema.org/draft-07/schema#
+description: sit-inbox config file
+properties:
+  inbox:
+    description: A dictionary of named inboxes
+    patternProperties:
+      '[a-zA-Z0-9\-_]+':
+        description: Inbox
+        allOf:
+        - properties:
+            default_repository:
+              description: By default, received updates will be routed to this repository
+              type: string
+            type:
+              description: Inbox type
+              enum:
+              - email
+              type: string
+          required:
+          - type
+          type: object
+        - if:
+            properties:
+              type:
+                const: email
+          then:
+            allOf:
+            - properties:
+                maildrop:
+                  type: string
+                  description: Maildrop filter rules (https://www.courier-mta.org/maildrop/maildropfilter.html), will be followed by unconditional piping to `email-ingress`. The rules can be used to filter out emails that shouldn't be ingressed.
+                retriever:
+                  description: Type of the retriever
+                  enum:
+                  - MailboxRetriever
+                  - SimplePOP3Retriever
+                  - BrokenUIDLPOP3Retriever
+                  - SimpleIMAPRetriever
+                  - SimplePOP3SSLRetriever
+                  - BrokenUIDLPOP3SSLRetriever
+                  - SimpleIMAPSSLRetriever
+                  - MultidropPOP3Retriever
+                  - MultidropPOP3SSLRetriever
+                  - MultidropSDPSRetriever
+                  - MultidropIMAPRetriever
+                  - MultidropIMAPSSLRetriever
+                  type: string
+                autostart:
+                  description: Indicates if the inbox retriever should be started upon sit-inbox startup
+                  type: "boolean"
+                  default: true
+              type: object
+            - else:
+                allOf:
+                - properties:
+                    port:
+                      description: Server port
+                      exclusiveMinimum: 0
+                      type: integer
+                    server:
+                      description: Server hostname
+                      type: string
+                    username:
+                      description: User name
+                      type: string
+                  required:
+                  - server
+                  - username
+                  type: object
+                - oneOf:
+                  - properties:
+                      password:
+                        description: User's password
+                        type: string
+                    required:
+                    - password
+                    type: object
+                  - properties:
+                      password_command:
+                        description: A command with arguments to obtain user's password
+                        items:
+                          type: string
+                        type: array
+                    required:
+                    - password_command
+                    type: object
+              if:
+                properties:
+                  retriever:
+                    const: MailboxRetriever
+              then:
+                properties:
+                  path:
+                    description: Path to the Maildir
+                    type: string
+                required:
+                - path
+                type: object
+    type: object
+  repository:
+    description: A dictionary of named repositories
+    patternProperties:
+      '[a-zA-Z0-9\-_]+':
+        properties:
+          source:
+            description: Master repository source (location)
+            type: string
+          type:
+            description: Repository type
+            enum:
+            - git
+            type: string
+        required:
+        - type
+        - source
+        type: object
+    type: object
+type: object

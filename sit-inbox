@@ -1,0 +1,29 @@
+#! /usr/bin/env bash
+
+case "$1" in
+        new)
+                mkdir -p "$2/etc"
+                mkdir -p "$2/repositories"
+                mkdir -p "$2/.oldmail"
+                touch "$2/etc/config.toml"
+                touch "$2/.dockerargs"
+                echo "Edit $2/etc/config.toml to configure this instance"
+                ;;
+        run)
+                if [ -z "$2" ]; then
+                        echo "Usage: sit-inbox run <path> [command]"
+                        exit 1
+                fi
+                docker_args=$(eval "echo $(cat "$(pwd)/$2/.dockerargs")")
+                docker run \
+                        -v "$(pwd)/$2/etc:/etc/sit-inbox" \
+                        -v "$(pwd)/$2/repositories:/var/lib/repositories" \
+                        -v "$(pwd)/$2/.oldmail:/var/run/oldmail" \
+                        ${docker_args} \
+                        -ti sit-inbox $3 
+                ;;
+        *)
+                echo "Usage: sit-inbox new [path]"
+                echo "       sit-inbox run <path> [command]"
+                exit 1
+esac
