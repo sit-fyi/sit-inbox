@@ -1,0 +1,222 @@
+From fc7e0eecbd17cd5f31febd52014578edc575cb7a Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 17 Jul 2018 13:17:28 +0700
+Subject: [PATCH] Problem: unattended operation
+
+Currently, we will poll inboxes at a startup and upon user request in
+the UI. However, if this is left unattended, nothing will happen, which
+is not very useful.
+
+Solution: allow configuring cron jobs for fetching updates
+(`cron` option)
+---
+ .../BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.authors       |  1 +
+ .../.prev/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB          |  0
+ .../BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.signature     | 17 +++++++++++++++++
+ .../BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.timestamp     |  1 +
+ .../.type/DetailsChanged                            |  0
+ .../BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/text           |  4 ++++
+ .../NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.authors       |  1 +
+ .../.prev/ES3ZE4P42JPRRG7O7STZDU2N2KTK7KV6          |  0
+ .../NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.signature     | 17 +++++++++++++++++
+ .../NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.timestamp     |  1 +
+ .../.type/SummaryChanged                            |  0
+ .../NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/text           |  1 +
+ README.md                                           | 21 ++++++++++++++++++---
+ playbook/playbook.yml                               | 10 ++++++++++
+ schema.yaml                                         |  4 ++++
+ 15 files changed, 75 insertions(+), 3 deletions(-)
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.authors
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.prev/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.signature
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.timestamp
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.type/DetailsChanged
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/text
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.authors
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.prev/ES3ZE4P42JPRRG7O7STZDU2N2KTK7KV6
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.signature
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.timestamp
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.type/SummaryChanged
+ create mode 100644 .sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/text
+
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.authors b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.authors
+new file mode 100644
+index 0000000..8022052
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.authors
+@@ -0,0 +1 @@
++Yurii Rashkovskii <me@yrashk.com>
+\ No newline at end of file
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.prev/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.prev/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB
+new file mode 100644
+index 0000000..e69de29
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.signature b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.signature
+new file mode 100644
+index 0000000..c6dff5c
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.signature
+@@ -0,0 +1,17 @@
++-----BEGIN PGP SIGNATURE-----
++
++iQJCBAABCAAsFiEEjmkaFOaskcs7s6g8HWDXz9gIRf8FAltNijMOHG1lQHlyYXNo
++ay5jb20ACgkQHWDXz9gIRf/Okw/7BKTFMQIVhKfcKP7Vomfn3hRp23DtExLBB3ga
++U7qUmleW0TBVN55IpnK9Ke4SaefGDbI/HwvGXFjtKBB57mm+XQt+rMNDJgdTM+N+
++W1Gn31tI1aPz7s32HzLPHQLDPuUlJcdLxbJYzgXpsKejhQ6FOaiFlt/VKYvkecQc
++7NUNal1pA3Oc25wGOhBA9otJNHhjfE44XKQpLYwJJTi2T27WGbYYyX7m9Ll9RBDM
++MdRZWicTOgnlSxFcH6815+DrJhD/mNqt1C0GRvbr+UC7WpHXr6Q+5CKQhwzXcHxu
++BZJlYWi0Zaqt1+G9p7s0ZNKhKIOdQapmq2xzV+dk3G1PtF2VAcMigOPutuJoOz6I
++R0I6h63piQmhHXtPAqdRovR3qTKoiBmAL41fDg63eRSsV7A5n43wKXSVFvbN4GNK
++zXRTWRekhUbR+MbKlOS5qa01SHXPode+y5RUoILXRwLN+HsV3CYVOvjX+GQw+R1T
++H4tdgwhC/IfZymtXb88/mgKnfh3cfksH9uPvwKamWev9bMnf8P1S8hi5B1ldv2vs
++E0iLIqk9QwEwR8Is61/4cC/TbLKAB9jAUturVXQSDGBPDEFlzJ1rI0/op4xdeCgI
++PNP7XsIzZt/P7HDmJyMmVgp7SQTdNJYUdPTNadPKum3/ZlZsrJKYHfAPCE2MuYlw
++2Xnw4gc=
++=ZxQB
++-----END PGP SIGNATURE-----
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.timestamp b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.timestamp
+new file mode 100644
+index 0000000..21995f8
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.timestamp
+@@ -0,0 +1 @@
++2018-07-17T06:18:27.527Z
+\ No newline at end of file
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.type/DetailsChanged b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/.type/DetailsChanged
+new file mode 100644
+index 0000000..e69de29
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/text b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/text
+new file mode 100644
+index 0000000..d43cd7f
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/BS55XCOSKPKU42LBWG5DPBRPVBBG5VEV/text
+@@ -0,0 +1,4 @@
++Currently, we will poll inboxes at a startup and upon user request in the UI. However, if this is left unattended,
++nothing will happen, which is not very useful.
++
++Proposed solution: allow configuring cron jobs for fetching updates from inboxes.
+\ No newline at end of file
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.authors b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.authors
+new file mode 100644
+index 0000000..8022052
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.authors
+@@ -0,0 +1 @@
++Yurii Rashkovskii <me@yrashk.com>
+\ No newline at end of file
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.prev/ES3ZE4P42JPRRG7O7STZDU2N2KTK7KV6 b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.prev/ES3ZE4P42JPRRG7O7STZDU2N2KTK7KV6
+new file mode 100644
+index 0000000..e69de29
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.signature b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.signature
+new file mode 100644
+index 0000000..c019ffb
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.signature
+@@ -0,0 +1,17 @@
++-----BEGIN PGP SIGNATURE-----
++
++iQJCBAABCAAsFiEEjmkaFOaskcs7s6g8HWDXz9gIRf8FAltNijMOHG1lQHlyYXNo
++ay5jb20ACgkQHWDXz9gIRf/behAA0AudX0PUhZDks+PQtc3xxLYUCm27sEZecMNd
++6BEVcB4FPw6WsaJlnNTdaM8ru3mCmcGll4SdXCQxNEZ94JmWoq93+zyI+ztl2A1h
++YDh2r4mqH9HURzpxLwi3bsQWl1ytdzBGPUygqQ0V3yXtgBIM+BNmR9xgl49LYTZm
++POaHmDWQW5kupa+lQgYfHrKU+ZlyG1nwifA09nJvslwdl0FhM3HAjkFSRh3Bqis2
++Swod5E//YikuhF+6GwFIhu2zdWnW5Q0YYphEZ7yfu6nQGDJ4AKLACf+kJUtIVQeV
++BCjTAAyrSLCgYc0ol52UeHE2S717TTe9xhdOBHQ7QoIuSZkrw70EHnJQnQSHHQkS
++Qf67C7AOZIbRyvMsNmOQqDMpfPSknRL6KHdkDQ64k98LRhe3jS7b/qnwuQkW61JO
++cxX1dj3FqpILM6V2ch7LnM6gYrvbdjv6rmFKvJw9tQSVFN3CVDYsdIO0oZy9avDF
++Q59XbEPws09Cp9QwLwvxMx53BRO6sDNVfwjjI6OQHBR0V0Wpy0ohvLEl7ajDmvpN
++20lxuBzLHMwZp22DxJl6RYz25BG1lcYTKscgCO+kbsibG7E8WMR3aUIoOy3X7Rhg
++osD8fwFpJIi0/MdqbrdpJR5JxkeWkMP4TpEnZ33NSNufoXxV3+6tZkUu8Lky5y8I
++X9bMorI=
++=RhwG
++-----END PGP SIGNATURE-----
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.timestamp b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.timestamp
+new file mode 100644
+index 0000000..21995f8
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.timestamp
+@@ -0,0 +1 @@
++2018-07-17T06:18:27.527Z
+\ No newline at end of file
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.type/SummaryChanged b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/.type/SummaryChanged
+new file mode 100644
+index 0000000..e69de29
+diff --git a/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/text b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/text
+new file mode 100644
+index 0000000..7a11d47
+--- /dev/null
++++ b/.sit/items/8adbb0ad-09dc-4de4-9dfa-1c4b15633563/NMQ6VDKEOFDZ7AW3RR4IBXDPR3GH3ATB/text
+@@ -0,0 +1 @@
++Problem: unattended operation
+\ No newline at end of file
+diff --git a/README.md b/README.md
+index 6e0272f..3b274ba 100644
+--- a/README.md
++++ b/README.md
+@@ -51,10 +51,25 @@ After (successful) [re-]provisioning, you should see something like this:
+ <img src="doc/sit-inbox.png" alt="Screenshot" width="300px">
+ 
+ Upon startup, sit-inbox will attempt to retrieve updates
+-from inboxes that don't have `autostart` disabled.
++from inboxes that don't have `autostart` disabled. 
+ 
+-The interface allows the operator to observe logs and manually invoke
+-operations such as mail retrieval.
++By default, it will keep fetching email every minute. this can be changed
++with the `cron` option for every `inbox` config entry, it
++takes the standard crontab time entry format:
++
++```
++*     *     *   *    *
++-     -     -   -    -
++|     |     |   |    |
++|     |     |   |    +----- day of week (0 - 6) (Sunday=0)
++|     |     |   +------- month (1 - 12)
++|     |     +--------- day of        month (1 - 31)
++|     +----------- hour (0 - 23)
+++------------- min (0 - 59)
++```
++
++The above user interface also  allows the operator to observe logs and manually
++invoke operations such as mail retrieval.
+ 
+ ## Configuration
+ 
+diff --git a/playbook/playbook.yml b/playbook/playbook.yml
+index e6971f7..bdc2ed7 100644
+--- a/playbook/playbook.yml
++++ b/playbook/playbook.yml
+@@ -41,6 +41,16 @@
+                     job: "getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key }}"
+             loop: "{{ inbox | dict2items }}"
+             when: item.value.type == "email" and (item.value.autostart | default(true))
++          - name: periodic getmail
++            cron:
++                    name: "get email for {{ item.key }} periodically"
++                    minute: "{{ (item.value.cron | default('* * * * *')).split(' ')[0] }}"
++                    hour: "{{ (item.value.cron | default('* * * * *')).split(' ')[1] }}"
++                    day: "{{ (item.value.cron | default('* * * * *')).split(' ')[2] }}"
++                    month: "{{ (item.value.cron | default('* * * * *')).split(' ')[3] }}"
++                    weekday: "{{ (item.value.cron | default('* * * * *')).split(' ')[4] }}"
++                    job: "getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key }}"
++            loop: "{{ inbox | dict2items }}"
+           - name: check-email script
+             template:
+                     src: templates/check-email.j2
+diff --git a/schema.yaml b/schema.yaml
+index 4283e06..37a6d98 100644
+--- a/schema.yaml
++++ b/schema.yaml
+@@ -17,6 +17,10 @@ properties:
+               enum:
+               - email
+               type: string
++            cron:
++              description: Crontab time entry for periodic retrievals
++              type: string
++              default: "* * * * *"
+           required:
+           - type
+           type: object
+-- 
+2.16.4
+
