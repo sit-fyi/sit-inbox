@@ -1,6 +1,8 @@
 [repository.repo]
 type = "git"
 source = "/repo.test"
+email_response = true
+email_from = "sit@inbox"
 
 [repository.repo1]
 type = "git"

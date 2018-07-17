@@ -92,3 +92,8 @@
                     mode: 0700
             loop: "{{ repository | dict2items }}"
             when: item.value.type == "git"
+          - name: msmtp configuration
+            template:
+                    src: templates/msmtprc.j2
+                    dest: "/root/.msmtprc"
+                    mode: 0600
