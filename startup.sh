@@ -36,12 +36,17 @@ while true; do
                 --and-widget --keep-tite --keep-window \
                 --begin 0 0 --no-shadow --menu "Action" 10 $(expr ${cols} / 4) 10 \
                 "M" "Check mail" \
+                "R" "Reload configuration" \
                 "Q" "Quit" \
                 --output-fd 1)
         case "${result}" in
                 Q)
                         clear
                         exit 0
+                        ;;
+                R)
+                        clear
+                        exec startup
                         ;;
                 M)
                         check-email &
