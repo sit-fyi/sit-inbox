@@ -133,5 +133,11 @@ properties:
                 git_email:
                    type: string
                    description: git user.email configuration setting
+                email_response:
+                   type: boolean
+                   description: sit-inbox will reply to the patch if enabled and smtp is configured
+                email_from:
+                   type: string
+                   description: email address sit-inbox will e-mail from
     type: object
 type: object

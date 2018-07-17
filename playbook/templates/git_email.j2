@@ -1,5 +1,18 @@
 #! /usr/bin/env bash
-email_reponse=${EMAIL_RESPONSE:-{{ item.value.email_response | default('') }}}
+email_response=${EMAIL_RESPONSE:-{{ item.value.email_response | default(False) }}}
+send_email () {
+        if [ "${email_response}" == "True" ]; then
+                response=$(mktemp)
+                printf $"--\nsit-inbox" > "${response}"
+                body=$(echo $1 | sed s/\\n/%n/g)
+                cat "${file}" | \
+                        mailbot -A 'From: {{ item.value.email_from | default('') }}' \
+                        -S "Hi %F,%n%n${body}%n" \
+                        -t "${response}" /usr/sbin/sendmail -t
+                rm -f "${response}"
+        fi
+}
+
 file=$(mktemp)
 cat <&0 > "${file}"
 temp=$(mktemp -d)
@@ -31,18 +44,18 @@ if [ "${result}" == "0" ]; then
         fi
         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
         outside_files=
-        for file in ${files}; do
-                if [ "${file:0:${target_dir_len}}" != "${target_dir}" ]; then
-                        outside_files="${outside_files}${file} is outside of ${target_dir}\n"
+        for _file in ${files}; do
+                if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                        outside_files="${outside_files}${_file} is outside of ${target_dir}\n"
                         continue
                 fi
 
-                item=$(echo "${file}" | cut -d'/' -f 3)
-                record=$(echo "${file}" | cut -d'/' -f 4)
-                record_path=$(echo "${file}" | cut -d'/' -f 1-4)
+                item=$(echo "${_file}" | cut -d'/' -f 3)
+                record=$(echo "${_file}" | cut -d'/' -f 4)
+                record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
 
-                if [ -f "${original}/${file}" ]; then
-                        outside_files="${outside_files}File ${file} already exists in the target repository\n"
+                if [ -f "${original}/${_file}" ]; then
+                        outside_files="${outside_files}File ${_file} already exists in the target repository\n"
                         continue
                 fi
 
@@ -57,15 +70,20 @@ if [ "${result}" == "0" ]; then
         if [ "${outside_files}" == "" ]; then
                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
                 logger -s -t "git.{{ item.key }}" "Patch applied and pushed"
+                send_email "Thank you for your contribution. It has been successfully pushed to the master repository."
         else
                 logger -s -t "git.{{ item.key }}" "Patch rejected"
                 printf "${outside_files}" | logger -s -t "git.{{ item.key }}"
+                send_email $"Thank you for your contribution. However, it seems like it couldn't pass our safety filter.\n\nPlease resolve the following issues:\n\n${outside_files}"
         fi
 else
         if [[ "${git_am}" =~ "Patch is empty" ]]; then
                 logger -s -t "git.{{ item.key }}" "No patch found, skipping"
         else
-                logger -s -t "git.{{ item.key }}" "Applying patch failed ${git_am}"
+                logger -s -t "git.{{ item.key }}" "Patch rejected"
+                logger -s -t "git.{{ item.key }}" "${git_am}"
+                send_email $"Thank you for your contribution. However, it seems like it couldn't be merged.\n\nPlease resolve the following issue:\n\n${git_am}"
+
         fi
         git am --abort 2>/dev/null
 fi

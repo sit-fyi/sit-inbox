@@ -20,6 +20,7 @@ RUN git clone https://github.com/bats-core/bats-core && \
     cd bats-core && git checkout v1.1.0 && ./install.sh /usr/local && cd .. && rm -rf bats-core
 RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
 RUN apk add nodejs npm && npm install -g ajv-cli
+RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
 RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
 
 VOLUME [ "/etc/sit-inbox", "/var/lib/repositories", "/var/run/oldmail" ]

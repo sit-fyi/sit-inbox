@@ -1,0 +1,29 @@
+defaults
+tls_trust_file /etc/ssl/certs/ca-certificates.crt
+
+{% if smtp is defined -%}
+
+{% if smtp.defaults is defined -%}
+{% for item in smtp.defaults | dict2items -%}
+{{ item.key }} {{ item.value }}
+{% endfor -%}
+{% endif -%}
+
+{% if smtp.account is defined -%}
+{% for item in smtp.account | dict2items -%}
+account {{ item.key }}
+{% for cfg in item.value | dict2items -%}
+  {{ cfg.key }} {{ cfg.value }}
+{% endfor -%}
+{% endfor -%}
+{% endif -%}
+
+{% if smtp.default_account is defined -%}
+account default : {{ smtp.default_account }}
+{% else -%}
+{% if (smtp.account | dict2items)[0] is defined -%}
+account default : {{ (smtp.account | dict2items)[0].key }}
+{% endif -%}
+{% endif -%}
+
+{% endif -%}

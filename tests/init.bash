@@ -18,5 +18,10 @@ if ! [ -f /.initialized ]; then
   ANSIBLE_STDOUT_CALLBACK=unixy ansible-playbook /playbook/playbook.yml
   popd
   syslogd
+  cat <<EOF >/usr/sbin/sendmail
+#! /usr/bin/env bash
+cat <&0 > /root/sent
+EOF
+  chmod +x /usr/sbin/sendmail
   touch /.initialized
 fi
