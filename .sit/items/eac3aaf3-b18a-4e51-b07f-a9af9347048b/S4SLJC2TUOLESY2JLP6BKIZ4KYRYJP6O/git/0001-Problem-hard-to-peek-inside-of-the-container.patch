@@ -1,0 +1,44 @@
+From f5d680dab0d0915becf4abe8ea1bc83519bece93 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 17 Jul 2018 22:11:58 +0700
+Subject: [PATCH] Problem: hard to peek inside of the container
+
+When running a container using `sit-inbox` tool
+the only way to look into the files is to attach
+to it.
+
+Solution: add "Shell" action menu item
+that starts a shell in the same session
+---
+ startup.sh | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/startup.sh b/startup.sh
+index 2ed45fe..e85d026 100755
+--- a/startup.sh
++++ b/startup.sh
+@@ -34,9 +34,10 @@ while true; do
+         result=$(dialog --keep-window \
+                 --begin 0 $(expr ${cols} / 4) --tailboxbg /var/log/messages ${lines} $(expr ${cols} \* 3 / 4)\
+                 --and-widget --keep-tite --keep-window \
+-                --begin 0 0 --no-shadow --menu "Action" 10 $(expr ${cols} / 4) 10 \
++                --begin 0 0 --no-shadow --menu "Action" 11 $(expr ${cols} / 4) 11 \
+                 "M" "Check mail" \
+                 "R" "Reload configuration" \
++                "S" "Shell" \
+                 "Q" "Quit" \
+                 --output-fd 1)
+         case "${result}" in
+@@ -51,6 +52,9 @@ while true; do
+                 M)
+                         check-email &
+                         ;;
++                S)
++                        bash
++                        ;;
+                 *)      echo
+                         ;;
+         esac
+-- 
+2.16.4
+

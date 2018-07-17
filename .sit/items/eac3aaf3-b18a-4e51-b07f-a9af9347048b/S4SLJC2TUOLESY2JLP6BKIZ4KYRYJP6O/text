@@ -1,0 +1,7 @@
+When running a container using `sit-inbox` tool
+the only way to look into the files is to attach
+to it.
+
+Solution: add "Shell" action menu item
+that starts a shell in the same session
+
