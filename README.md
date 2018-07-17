@@ -1,4 +1,9 @@
-# sit-inbox
+<h1 align="center"><center>
+<img src="artwork/sit-inbox.png" alt="sit-inbox" width="150">
+</center>
+<br>
+sit-inbox
+</h1>
 
 *sit-inbox* is a tool that helps managing inbound additions for
 [SIT](https://sit.fyi) repositories over different transports. A common case
@@ -13,7 +18,7 @@ to the internet.
 
 Currently, sit-inbox supports:
 
-* receiving patches for **Git-hosted** SIT repositories over **IMAP, POP3** and **Maildir** 
+* receiving patches for **Git-hosted** SIT repositories over **IMAP, POP3** and **Maildir**
 
 This list is expected to grow.
 
@@ -51,7 +56,7 @@ After (successful) [re-]provisioning, you should see something like this:
 <img src="doc/sit-inbox.png" alt="Screenshot" width="300px">
 
 Upon startup, sit-inbox will attempt to retrieve updates
-from inboxes that don't have `autostart` disabled. 
+from inboxes that don't have `autostart` disabled.
 
 By default, it will keep fetching email every minute. this can be changed
 with the `cron` option for every `inbox` config entry, it
