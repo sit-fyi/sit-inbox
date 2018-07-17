@@ -12,6 +12,7 @@ if ! [ -f /.initialized ]; then
   git commit -m "init"
   cd ..
   git clone --bare /repo /repo.test
+  git clone --bare /repo /repo1.test
   mkdir -p /playbook/roles/common/vars
   toml2yaml /tests/fixtures/config.toml > /playbook/roles/common/vars/main.yml
   ANSIBLE_STDOUT_CALLBACK=unixy ansible-playbook /playbook/playbook.yml

@@ -1,10 +1,7 @@
+load common
+
 setup () {
-  rm -rf /repo.test
-  git clone --bare /repo /repo.test
-  cp /var/lib/repositories/repo/.git/config /tmp/config
-  rm -rf /var/lib/repositories/repo
-  git clone /repo.test /var/lib/repositories/repo
-  mv /tmp/config /var/lib/repositories/repo/.git/config
+  reinit_repo repo /repo.test
 }
 
 @test "git patch workflow: email with no patch" {

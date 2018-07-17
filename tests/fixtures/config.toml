@@ -2,11 +2,21 @@
 type = "git"
 source = "/repo.test"
 
+[repository.repo1]
+type = "git"
+source = "/repo1.test"
+
 [inbox.email]
 type = "email"
 retriever = "MailboxRetriever"
 path = "/inbox"
 default_repository = "repo"
+maildrop = """
+if ( /^From: test <special@test>/)
+{
+  to "|email-ingress repo1"
+}
+"""
 
 [inbox.mbox]
 type = "email"
