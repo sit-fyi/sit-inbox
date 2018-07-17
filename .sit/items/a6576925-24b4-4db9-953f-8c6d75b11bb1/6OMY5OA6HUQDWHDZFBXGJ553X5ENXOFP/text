@@ -1,0 +1,5 @@
+Currently, once somebody sends a patch over email, they will never hear back. They can, of course,
+monitor the master repository to see if their patch has appeared -- but this won't provide active feedback
+nor will it indicate if there's any problem with their patch if it was rejected.
+
+Proposed solution: send an email back with the update on what happened to the patch.
