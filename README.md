@@ -79,3 +79,17 @@ default_repository = "repo"
 Please refer to [schema.yaml](schema.yaml) for *almost-human-interpretable*
 schema for the `config.toml` file. It'd be great to convert it into Markdown
 or something like it, so if you're up to it -- please contribute.
+
+## Updating issues
+
+In order to manage issues and merge requests in this project, we're using
+[SIT](https://sit.fyi) with
+[issue-tracking](https://modules.sit.fyi/issue-tracking) module and
+**sit-inbox** itself (duh!)
+
+Assuming basic familiarity with SIT workflow (sit-web for issues, `sit mr`
+script), prepare a branch with a patch and send updates to this repository:
+
+```
+git send-email --to=sit-inbox@inbox.sit.fyi master..<branch>
+```
