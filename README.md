@@ -13,7 +13,7 @@ to the internet.
 
 Currently, sit-inbox supports:
 
-* receiving patches for **Git-hosted** SIT repositories over **email** and **Maildir** 
+* receiving patches for **Git-hosted** SIT repositories over **IMAP, POP3** and **Maildir** 
 
 This list is expected to grow.
 
