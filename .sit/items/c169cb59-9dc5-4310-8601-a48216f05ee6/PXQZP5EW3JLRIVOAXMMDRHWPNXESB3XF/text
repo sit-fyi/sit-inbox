@@ -1,0 +1,15 @@
+When sit-inbox signs off a patch, this is what
+we can see:
+
+```
+Signed-off-by: sit-inbox <inbox@sit>
+````
+
+This e-mail address, being the default one, is not particularly
+great.
+
+Solution: expose repository.*.git_email and .git_username configuration
+and include them in the schema.
+
+Also, include them in the example config.
+

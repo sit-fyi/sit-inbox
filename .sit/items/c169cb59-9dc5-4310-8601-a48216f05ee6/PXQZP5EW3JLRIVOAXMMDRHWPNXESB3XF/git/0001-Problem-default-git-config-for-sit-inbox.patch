@@ -1,0 +1,90 @@
+From 8293eeb89a35bf5b1339b29f1876f929d7f12bb3 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 17 Jul 2018 11:36:06 +0700
+Subject: [PATCH] Problem: default git config for sit-inbox
+
+When sit-inbox signs off a patch, this is what
+we can see:
+
+```
+Signed-off-by: sit-inbox <inbox@sit>
+````
+
+This e-mail address, being the default one, is not particularly
+great.
+
+Solution: expose repository.*.git_email and .git_username configuration
+and include them in the schema.
+
+Also, include them in the example config.
+---
+ README.md   |  2 ++
+ schema.yaml | 40 +++++++++++++++++++++++++++-------------
+ 2 files changed, 29 insertions(+), 13 deletions(-)
+
+diff --git a/README.md b/README.md
+index 67257f1..eb81d87 100644
+--- a/README.md
++++ b/README.md
+@@ -64,6 +64,8 @@ An example configuration for a trivial setup will look something like:
+ [repository.repo]
+ type = "git"
+ source = "https://username:password@host/repo.git"
++git_username = "sit-inbox"
++git_email = "inbox@server.com"
+ 
+ [inbox.email]
+ type = "email"
+diff --git a/schema.yaml b/schema.yaml
+index 0e72b35..4283e06 100644
+--- a/schema.yaml
++++ b/schema.yaml
+@@ -102,18 +102,32 @@ properties:
+     description: A dictionary of named repositories
+     patternProperties:
+       '[a-zA-Z0-9\-_]+':
+-        properties:
+-          source:
+-            description: Master repository source (location)
+-            type: string
+-          type:
+-            description: Repository type
+-            enum:
+-            - git
+-            type: string
+-        required:
+-        - type
+-        - source
+-        type: object
++        allOf:
++          - properties:
++                  source:
++                          description: Master repository source (location)
++                          type: string
++                  type:
++                          description: Repository type
++                          enum:
++                                  - git
++                          type: string
++            required:
++                    - type
++                    - source
++            type: object
++          - if:
++             properties:
++               type:
++                 const: git
++            then:
++              type: object
++              properties:
++                git_username:
++                   type: string
++                   description: git user.name configurations setting
++                git_email:
++                   type: string
++                   description: git user.email configuration setting
+     type: object
+ type: object
+-- 
+2.16.4
+
