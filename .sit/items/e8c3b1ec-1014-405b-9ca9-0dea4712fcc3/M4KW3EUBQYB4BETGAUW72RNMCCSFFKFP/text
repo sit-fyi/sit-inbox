@@ -1,0 +1,5 @@
+After editing configuratoin, one needs to restart
+sit-inbox. This is a minor inconvenience.
+
+Solution: add "Reload configuration" into the action menu
+

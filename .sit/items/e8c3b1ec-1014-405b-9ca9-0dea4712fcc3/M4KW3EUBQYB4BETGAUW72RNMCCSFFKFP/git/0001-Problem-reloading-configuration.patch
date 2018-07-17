@@ -1,0 +1,39 @@
+From 3edeb575ae7a3a03d66410fb0e8fe0a96630d633 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 17 Jul 2018 16:44:49 +0700
+Subject: [PATCH] Problem: reloading configuration
+
+After editing configuratoin, one needs to restart
+sit-inbox. This is a minor inconvenience.
+
+Solution: add "Reload configuration" into the action menu
+---
+ startup.sh | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/startup.sh b/startup.sh
+index 52c8ecf..2ed45fe 100755
+--- a/startup.sh
++++ b/startup.sh
+@@ -36,6 +36,7 @@ while true; do
+                 --and-widget --keep-tite --keep-window \
+                 --begin 0 0 --no-shadow --menu "Action" 10 $(expr ${cols} / 4) 10 \
+                 "M" "Check mail" \
++                "R" "Reload configuration" \
+                 "Q" "Quit" \
+                 --output-fd 1)
+         case "${result}" in
+@@ -43,6 +44,10 @@ while true; do
+                         clear
+                         exit 0
+                         ;;
++                R)
++                        clear
++                        exec startup
++                        ;;
+                 M)
+                         check-email &
+                         ;;
+-- 
+2.16.4
+
