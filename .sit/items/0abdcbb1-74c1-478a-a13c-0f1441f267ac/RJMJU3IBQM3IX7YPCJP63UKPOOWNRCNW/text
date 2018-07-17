@@ -1,0 +1,11 @@
+Right now, `git push` will swallow errors:
+
+```bash
+git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
+```
+
+If there's anything wrong with the configuration or a remote, it won't be noticed and sit-inbox will
+happily think everything is fine.
+
+Proposed solution: handle errors in this case. Once we have a response system in place, we can send
+one, but before that, need to see if we can make getmail to refetch it later by exiting with an error code or something.
