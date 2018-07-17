@@ -1,0 +1,11 @@
+Problem: above patches don't actually send the e-mails
+
+While tests pass, there was never even an attempt to
+send an email.
+
+Solution: specify MTA to `mailbot` explicitly
+
+By default, `mailbot` invokes `sendmail -f` and msmtp
+doesn't handle that well. Instead, `-t` should have been
+passed so that `msmtp` will read recipients from the
+message itself.

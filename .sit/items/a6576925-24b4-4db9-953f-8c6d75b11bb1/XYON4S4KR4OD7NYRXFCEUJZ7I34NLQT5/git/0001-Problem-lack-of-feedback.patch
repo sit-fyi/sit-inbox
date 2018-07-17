@@ -1,0 +1,298 @@
+From 0e6ef2609cd728b7e949943a3df54d0382199daf Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 17 Jul 2018 23:12:14 +0700
+Subject: [PATCH] Problem: lack of feedback
+
+Currently, once somebody sends a patch over email, they will never hear
+back. They can, of course, monitor the master repository to see if their
+patch has appeared -- but this won't provide active feedback nor will it
+indicate if there's any problem with their patch if it was rejected.
+
+Solution: send an email back with the update on what happened to the patch
+---
+ Dockerfile                      |  1 +
+ playbook/playbook.yml           |  5 ++++
+ playbook/templates/git_email.j2 | 37 ++++++++++++++++-------
+ playbook/templates/msmtprc.j2   | 29 ++++++++++++++++++
+ schema.yaml                     |  6 ++++
+ tests/fixtures/config.toml      |  2 ++
+ tests/git-patch.bats            | 66 +++++++++++++++++++++++++++++++++++++++++
+ tests/init.bash                 |  5 ++++
+ 8 files changed, 141 insertions(+), 10 deletions(-)
+ create mode 100644 playbook/templates/msmtprc.j2
+
+diff --git a/Dockerfile b/Dockerfile
+index f9eeedb..cc06fc3 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -20,6 +20,7 @@ RUN git clone https://github.com/bats-core/bats-core && \
+     cd bats-core && git checkout v1.1.0 && ./install.sh /usr/local && cd .. && rm -rf bats-core
+ RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
+ RUN apk add nodejs npm && npm install -g ajv-cli
++RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
+ RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
+ 
+ VOLUME [ "/etc/sit-inbox", "/var/lib/repositories", "/var/run/oldmail" ]
+diff --git a/playbook/playbook.yml b/playbook/playbook.yml
+index bdc2ed7..b0672d1 100644
+--- a/playbook/playbook.yml
++++ b/playbook/playbook.yml
+@@ -92,3 +92,8 @@
+                     mode: 0700
+             loop: "{{ repository | dict2items }}"
+             when: item.value.type == "git"
++          - name: msmtp configuration
++            template:
++                    src: templates/msmtprc.j2
++                    dest: "/root/.msmtprc"
++                    mode: 0600
+diff --git a/playbook/templates/git_email.j2 b/playbook/templates/git_email.j2
+index 6d59e93..4132c51 100644
+--- a/playbook/templates/git_email.j2
++++ b/playbook/templates/git_email.j2
+@@ -1,5 +1,17 @@
+ #! /usr/bin/env bash
+-email_reponse=${EMAIL_RESPONSE:-{{ item.value.email_response | default('') }}}
++email_response=${EMAIL_RESPONSE:-{{ item.value.email_response | default(False) }}}
++send_email () {
++        if [ "${email_response}" == "True" ]; then
++                response=$(mktemp)
++                printf $"$1" > "${response}"
++                cat "${file}" | \
++                        mailbot -A 'From: {{ item.value.email_from | default('') }}' \
++                        -S "%F sent a patch on %d:" \
++                        -t "${response}" /usr/sbin/sendmail -t
++                rm -f "${response}"
++        fi
++}
++
+ file=$(mktemp)
+ cat <&0 > "${file}"
+ temp=$(mktemp -d)
+@@ -31,18 +43,18 @@ if [ "${result}" == "0" ]; then
+         fi
+         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+         outside_files=
+-        for file in ${files}; do
+-                if [ "${file:0:${target_dir_len}}" != "${target_dir}" ]; then
+-                        outside_files="${outside_files}${file} is outside of ${target_dir}\n"
++        for _file in ${files}; do
++                if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
++                        outside_files="${outside_files}${_file} is outside of ${target_dir}\n"
+                         continue
+                 fi
+ 
+-                item=$(echo "${file}" | cut -d'/' -f 3)
+-                record=$(echo "${file}" | cut -d'/' -f 4)
+-                record_path=$(echo "${file}" | cut -d'/' -f 1-4)
++                item=$(echo "${_file}" | cut -d'/' -f 3)
++                record=$(echo "${_file}" | cut -d'/' -f 4)
++                record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
+ 
+-                if [ -f "${original}/${file}" ]; then
+-                        outside_files="${outside_files}File ${file} already exists in the target repository\n"
++                if [ -f "${original}/${_file}" ]; then
++                        outside_files="${outside_files}File ${_file} already exists in the target repository\n"
+                         continue
+                 fi
+ 
+@@ -57,15 +69,20 @@ if [ "${result}" == "0" ]; then
+         if [ "${outside_files}" == "" ]; then
+                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
+                 logger -s -t "git.{{ item.key }}" "Patch applied and pushed"
++                send_email "Thank you for your contribution. It has been successfully pushed to the master repository."
+         else
+                 logger -s -t "git.{{ item.key }}" "Patch rejected"
+                 printf "${outside_files}" | logger -s -t "git.{{ item.key }}"
++                send_email $"Thank you for your contribution. However, it seems like it couldn't pass our safety filter.\n\nPlease resolve the following issues:\n\n${outside_files}"
+         fi
+ else
+         if [[ "${git_am}" =~ "Patch is empty" ]]; then
+                 logger -s -t "git.{{ item.key }}" "No patch found, skipping"
+         else
+-                logger -s -t "git.{{ item.key }}" "Applying patch failed ${git_am}"
++                logger -s -t "git.{{ item.key }}" "Patch rejected"
++                logger -s -t "git.{{ item.key }}" "${git_am}"
++                send_email $"Thank you for your contribution. However, it seems like it couldn't be merged.\n\nPlease resolve the following issue:\n\n${git_am}"
++
+         fi
+         git am --abort 2>/dev/null
+ fi
+diff --git a/playbook/templates/msmtprc.j2 b/playbook/templates/msmtprc.j2
+new file mode 100644
+index 0000000..c9b0ec7
+--- /dev/null
++++ b/playbook/templates/msmtprc.j2
+@@ -0,0 +1,29 @@
++defaults
++tls_trust_file /etc/ssl/certs/ca-certificates.crt
++
++{% if smtp is defined -%}
++
++{% if smtp.defaults is defined -%}
++{% for item in smtp.defaults | dict2items -%}
++{{ item.key }} {{ item.value }}
++{% endfor -%}
++{% endif -%}
++
++{% if smtp.account is defined -%}
++{% for item in smtp.account | dict2items -%}
++account {{ item.key }}
++{% for cfg in item.value | dict2items -%}
++  {{ cfg.key }} {{ cfg.value }}
++{% endfor -%}
++{% endfor -%}
++{% endif -%}
++
++{% if smtp.default_account is defined -%}
++account default : {{ smtp.default_account }}
++{% else -%}
++{% if (smtp.account | dict2items)[0] is defined -%}
++account default : {{ (smtp.account | dict2items)[0].key }}
++{% endif -%}
++{% endif -%}
++
++{% endif -%}
+diff --git a/schema.yaml b/schema.yaml
+index 37a6d98..96572ba 100644
+--- a/schema.yaml
++++ b/schema.yaml
+@@ -133,5 +133,11 @@ properties:
+                 git_email:
+                    type: string
+                    description: git user.email configuration setting
++                email_response:
++                   type: boolean
++                   description: sit-inbox will reply to the patch if enabled and smtp is configured
++                email_from:
++                   type: string
++                   description: email address sit-inbox will e-mail from
+     type: object
+ type: object
+diff --git a/tests/fixtures/config.toml b/tests/fixtures/config.toml
+index c75c517..1e843a8 100644
+--- a/tests/fixtures/config.toml
++++ b/tests/fixtures/config.toml
+@@ -1,6 +1,8 @@
+ [repository.repo]
+ type = "git"
+ source = "/repo.test"
++email_response = true
++email_from = "sit@inbox"
+ 
+ [repository.repo1]
+ type = "git"
+diff --git a/tests/git-patch.bats b/tests/git-patch.bats
+index ccab79e..b267984 100644
+--- a/tests/git-patch.bats
++++ b/tests/git-patch.bats
+@@ -35,6 +35,12 @@ EOF
+   head=$(git -C /repo.test show HEAD)
+   [[ "${head}" =~ "correct patch" ]]
+   [[ "${head}" =~ "Signed-off-by: sit-inbox <inbox@sit>" ]]
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
++  [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
+ }
+ 
+ @test "git patch workflow: email with a patch with a conflicting record" {
+@@ -63,6 +69,13 @@ EOF
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+   [[ "${lines[4]}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+   rm -rf "${tmp}"
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
++  [[ "${output}" =~ "Please resolve the following issues" ]]
++  [[ "${output}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+ }
+ 
+ @test "git patch workflow: email with a patch manipulating existing files" {
+@@ -93,6 +106,14 @@ EOF
+   [[ "${lines[4]}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
+   [[ "${lines[5]}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
+   rm -rf "${tmp}"
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
++  [[ "${output}" =~ "Please resolve the following issues" ]]
++  [[ "${output}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
++  [[ "${output}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
+ }
+ 
+ @test "git patch workflow: email with a patch with files outside of .sit/items" {
+@@ -114,4 +135,49 @@ EOF
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+   [[ "${lines[4]}" =~ ".sit/a is outside of .sit/items" ]]
+   [[ "${lines[5]}" =~ "a is outside of .sit/items" ]]
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] files outside" ]]
++  [[ "${output}" =~ "Please resolve the following issues" ]]
++  [[ "${output}" =~ ".sit/a is outside of .sit/items" ]]
++  [[ "${output}" =~ "a is outside of .sit/items" ]]
+ }
++
++@test "git patch workflow: email with a conflicting patch" {
++  tmp0=$(mktemp -d)
++  git clone /repo.test "${tmp0}/repo"
++  tmp=$(mktemp -d)
++  git clone /repo.test "${tmp}/repo"
++  cd ${tmp}/repo
++  item=$(sit item)
++  record=$(sit record -t Test ${item})
++  git add .sit
++  git commit -m "correct patch"
++  git format-patch origin/master
++  run email.repo <*.patch
++  rm -rf ${tmp}
++  [ "$status" -eq 0 ]
++  # Now, try to simulate a conflict
++  cd "${tmp0}/repo"
++  mkdir -p .sit/items/${item}/${record}
++  echo test > .sit/items/${item}/${record}/.timestamp
++  git add .sit
++  git commit -m "correct patch"
++  git format-patch origin/master
++  run email.repo <*.patch
++  rm -rf ${tmp}
++  [ "$status" -eq 0 ]
++  [[ "${lines[3]}" =~ "Patch rejected" ]]
++  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
++  [[ "${output}" =~ "Please resolve the following issue" ]]
++  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++}
++
+diff --git a/tests/init.bash b/tests/init.bash
+index 6f92dd2..09e5905 100644
+--- a/tests/init.bash
++++ b/tests/init.bash
+@@ -18,5 +18,10 @@ if ! [ -f /.initialized ]; then
+   ANSIBLE_STDOUT_CALLBACK=unixy ansible-playbook /playbook/playbook.yml
+   popd
+   syslogd
++  cat <<EOF >/usr/sbin/sendmail
++#! /usr/bin/env bash
++cat <&0 > /root/sent
++EOF
++  chmod +x /usr/sbin/sendmail
+   touch /.initialized
+ fi
+-- 
+2.16.4
+
