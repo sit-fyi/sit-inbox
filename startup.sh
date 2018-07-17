@@ -34,9 +34,10 @@ while true; do
         result=$(dialog --keep-window \
                 --begin 0 $(expr ${cols} / 4) --tailboxbg /var/log/messages ${lines} $(expr ${cols} \* 3 / 4)\
                 --and-widget --keep-tite --keep-window \
-                --begin 0 0 --no-shadow --menu "Action" 10 $(expr ${cols} / 4) 10 \
+                --begin 0 0 --no-shadow --menu "Action" 11 $(expr ${cols} / 4) 11 \
                 "M" "Check mail" \
                 "R" "Reload configuration" \
+                "S" "Shell" \
                 "Q" "Quit" \
                 --output-fd 1)
         case "${result}" in
@@ -50,6 +51,9 @@ while true; do
                         ;;
                 M)
                         check-email &
+                        ;;
+                S)
+                        bash
                         ;;
                 *)      echo
                         ;;
