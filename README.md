@@ -64,6 +64,8 @@ An example configuration for a trivial setup will look something like:
 [repository.repo]
 type = "git"
 source = "https://username:password@host/repo.git"
+git_username = "sit-inbox"
+git_email = "inbox@server.com"
 
 [inbox.email]
 type = "email"
