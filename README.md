@@ -51,10 +51,25 @@ After (successful) [re-]provisioning, you should see something like this:
 <img src="doc/sit-inbox.png" alt="Screenshot" width="300px">
 
 Upon startup, sit-inbox will attempt to retrieve updates
-from inboxes that don't have `autostart` disabled.
+from inboxes that don't have `autostart` disabled. 
 
-The interface allows the operator to observe logs and manually invoke
-operations such as mail retrieval.
+By default, it will keep fetching email every minute. this can be changed
+with the `cron` option for every `inbox` config entry, it
+takes the standard crontab time entry format:
+
+```
+*     *     *   *    *
+-     -     -   -    -
+|     |     |   |    |
+|     |     |   |    +----- day of week (0 - 6) (Sunday=0)
+|     |     |   +------- month (1 - 12)
+|     |     +--------- day of        month (1 - 31)
+|     +----------- hour (0 - 23)
++------------- min (0 - 59)
+```
+
+The above user interface also  allows the operator to observe logs and manually
+invoke operations such as mail retrieval.
 
 ## Configuration
 

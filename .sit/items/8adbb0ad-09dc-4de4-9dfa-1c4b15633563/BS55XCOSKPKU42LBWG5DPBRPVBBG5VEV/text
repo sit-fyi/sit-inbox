@@ -1,0 +1,4 @@
+Currently, we will poll inboxes at a startup and upon user request in the UI. However, if this is left unattended,
+nothing will happen, which is not very useful.
+
+Proposed solution: allow configuring cron jobs for fetching updates from inboxes.

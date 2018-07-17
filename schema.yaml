@@ -17,6 +17,10 @@ properties:
               enum:
               - email
               type: string
+            cron:
+              description: Crontab time entry for periodic retrievals
+              type: string
+              default: "* * * * *"
           required:
           - type
           type: object

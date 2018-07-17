@@ -41,6 +41,16 @@
                     job: "getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key }}"
             loop: "{{ inbox | dict2items }}"
             when: item.value.type == "email" and (item.value.autostart | default(true))
+          - name: periodic getmail
+            cron:
+                    name: "get email for {{ item.key }} periodically"
+                    minute: "{{ (item.value.cron | default('* * * * *')).split(' ')[0] }}"
+                    hour: "{{ (item.value.cron | default('* * * * *')).split(' ')[1] }}"
+                    day: "{{ (item.value.cron | default('* * * * *')).split(' ')[2] }}"
+                    month: "{{ (item.value.cron | default('* * * * *')).split(' ')[3] }}"
+                    weekday: "{{ (item.value.cron | default('* * * * *')).split(' ')[4] }}"
+                    job: "getmail.{{ item.key }} 2>&1 | logger -t getmail.{{ item.key }}"
+            loop: "{{ inbox | dict2items }}"
           - name: check-email script
             template:
                     src: templates/check-email.j2
