@@ -1,0 +1,6 @@
+Problem: mailbot puts the response at the bottom
+
+With larger patches, it takes a lot of scrolling
+to get to the response.
+
+Solution: use salutation for the actual response
