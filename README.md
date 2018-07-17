@@ -58,6 +58,22 @@ operations such as mail retrieval.
 
 ## Configuration
 
+An example configuration for a trivial setup will look something like:
+
+```toml
+[repository.repo]
+type = "git"
+source = "https://username:password@host/repo.git"
+
+[inbox.email]
+type = "email"
+retriever = "SimpleIMAPSSLRetriever"
+server = "mail.server.com"
+username = "inbox@server.com"
+password = "password"
+default_repository = "repo"
+```
+
 Please refer to [schema.yaml](schema.yaml) for *almost-human-interpretable*
 schema for the `config.toml` file. It'd be great to convert it into Markdown
 or something like it, so if you're up to it -- please contribute.
