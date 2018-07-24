@@ -65,32 +65,32 @@
             when: item.value.type == "email"
           - name: clone git repositories
             git:
-                    dest: "/var/lib/repositories/{{ item.key }}"
+                    dest: "/var/lib/targets/{{ item.key }}"
                     repo: "{{ item.value.source }}"
-            loop: "{{ repository | dict2items }}"
+            loop: "{{ target | dict2items }}"
             when: item.value.type == "git"
           - name: configure git repository username
             git_config:
                     name: user.name
                     value: "{{ item.value.git_username | default('sit-inbox') }}"
                     scope: local
-                    repo: "/var/lib/repositories/{{ item.key }}"
-            loop: "{{ repository | dict2items }}"
+                    repo: "/var/lib/targets/{{ item.key }}"
+            loop: "{{ target | dict2items }}"
             when: item.value.type == "git"
           - name: configure git repository email
             git_config:
                     name: user.email
                     value: "{{ item.value.git_email | default('inbox@sit') }}"
                     scope: local
-                    repo: "/var/lib/repositories/{{ item.key }}"
-            loop: "{{ repository | dict2items }}"
+                    repo: "/var/lib/targets/{{ item.key }}"
+            loop: "{{ target | dict2items }}"
             when: item.value.type == "git"
           - name: git ingress
             template:
                     src: templates/git_email.j2
                     dest: "/usr/bin/email.{{ item.key }}"
                     mode: 0700
-            loop: "{{ repository | dict2items }}"
+            loop: "{{ target | dict2items }}"
             when: item.value.type == "git"
           - name: msmtp configuration
             template:

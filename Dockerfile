@@ -23,7 +23,7 @@ RUN apk add nodejs npm && npm install -g ajv-cli
 RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
 RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
 
-VOLUME [ "/etc/sit-inbox", "/var/lib/repositories", "/var/run/oldmail" ]
+VOLUME [ "/etc/sit-inbox", "/var/lib/targets", "/var/run/oldmail" ]
 
 ADD startup.sh /usr/bin/startup
 ADD email-ingress /usr/bin/email-ingress

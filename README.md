@@ -81,7 +81,7 @@ invoke operations such as mail retrieval.
 An example configuration for a trivial setup will look something like:
 
 ```toml
-[repository.repo]
+[target.repo]
 type = "git"
 source = "https://username:password@host/repo.git"
 git_username = "sit-inbox"
@@ -93,7 +93,7 @@ retriever = "SimpleIMAPSSLRetriever"
 server = "mail.server.com"
 username = "inbox@server.com"
 password = "password"
-default_repository = "repo"
+default_target = "repo"
 ```
 
 Please refer to [schema.yaml](schema.yaml) for *almost-human-interpretable*

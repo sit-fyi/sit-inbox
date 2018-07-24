@@ -17,12 +17,12 @@ file=$(mktemp)
 cat <&0 > "${file}"
 temp=$(mktemp -d)
 
-cd "/var/lib/repositories/{{ item.key }}"
+cd "/var/lib/targets/{{ item.key }}"
 
 git pull -f -q 2>/dev/null
 
 original="${temp}/original"
-git clone -q "/var/lib/repositories/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
+git clone -q "/var/lib/targets/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
 
 git branch -q -D inbox 2>/dev/null >/dev/null
 git checkout -b inbox 2>/dev/null
@@ -32,40 +32,58 @@ cat ${file} | reformail -X Date: -X From: -X Subject: | \
 git_am=$(git am -s -3 "${file}" 2>&1)
 result=$?
 
+
+declare -a repo_paths=({{ item.value.paths | default('.sit') }})
+
 if [ "${result}" == "0" ]; then
         files=$(git diff --name-only origin/{{ item.value.branch | default('master') }} inbox)
-        # Figure out if we're using .sit/items or deprecated .sit/issues
-       if [ -d "/.sit/issues" ]; then
-                target=issue
-                target_dir=.sit/issues
-        else
-                target=item
-                target_dir=.sit/items
-        fi
-        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
         outside_files=
         for _file in ${files}; do
-                if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
-                        outside_files="${outside_files}${_file} is outside of ${target_dir}\n"
-                        continue
-                fi
-
-                item=$(echo "${_file}" | cut -d'/' -f 3)
-                record=$(echo "${_file}" | cut -d'/' -f 4)
-                record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
-
-                if [ -f "${original}/${_file}" ]; then
-                        outside_files="${outside_files}File ${_file} already exists in the target repository\n"
-                        continue
-                fi
-
-                if [ -d "${original}/${record_path}" ]; then
-                        if ! [[ "${outside_files}" =~ "Record ${item}/${record} already exists in the target repository" ]]; then
-                                outside_files="${outside_files}Record ${item}/${record} already exists in the target repository\n"
+                outside_files_=
+                target_found=""
+                for repo_path in "${repo_paths[@]}"; do
+                        target_dir=${repo_path}/items
+                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+                        if [ "${target_dir:0:2}" == "./" ]; then
+                                target_dir=${target_dir:2:$target_dir_len}
+                                target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
                         fi
-                        continue
+                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                                _outside_files="${_outside_files}${_file} is outside of ${target_dir}\n"
+                        else
+                                target_found=${target_dir}
+                                break
+                        fi
+                done
+                if [ "${target_found}" == "" ]; then
+                        outside_files="${outside_files}${_outside_files}"
                 fi
+        done
+        for _file in ${files}; do
+                for repo_path in "${repo_paths[@]}"; do
+                        target_dir=${repo_path}/items
+                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
 
+                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                                continue
+                        fi
+
+                        item=$(echo "${_file}" | cut -d'/' -f 3)
+                        record=$(echo "${_file}" | cut -d'/' -f 4)
+                        record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
+
+                        if [ -f "${original}/${_file}" ]; then
+                                outside_files="${outside_files}File ${_file} already exists in the target repository\n"
+                                continue
+                        fi
+
+                        if [ -d "${original}/${record_path}" ]; then
+                                if ! [[ "${outside_files}" =~ "Record ${item}/${record} already exists in the target repository" ]]; then
+                                        outside_files="${outside_files}Record ${item}/${record} already exists in the target repository\n"
+                                fi
+                                continue
+                        fi
+                done
         done
         if [ "${outside_files}" == "" ]; then
                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
