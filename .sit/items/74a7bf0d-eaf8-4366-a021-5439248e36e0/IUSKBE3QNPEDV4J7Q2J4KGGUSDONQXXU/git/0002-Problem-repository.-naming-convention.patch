@@ -1,0 +1,274 @@
+From 3c8e74436116f3017269ec15a7a48db5f65d3487 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 24 Jul 2018 18:06:17 +0700
+Subject: [PATCH 2/2] Problem: repository.* naming convention
+
+This convention doesn't make a lot of sense anymore as it can contain
+multiple SIT repositories now. It's very confusing to have
+repositories with multiple repositories.
+
+Solution: rename `repository` to `target`
+---
+ Dockerfile                      |  2 +-
+ README.md                       |  4 ++--
+ email-ingress                   |  4 ++--
+ playbook/playbook.yml           | 14 +++++++-------
+ playbook/templates/getmail.j2   |  4 ++--
+ playbook/templates/git_email.j2 |  4 ++--
+ schema.yaml                     | 12 ++++++------
+ sit-inbox                       |  4 ++--
+ tests/common.bash               |  8 ++++----
+ tests/email.bats                |  3 +--
+ tests/fixtures/config.toml      |  6 +++---
+ 11 files changed, 32 insertions(+), 33 deletions(-)
+
+diff --git a/Dockerfile b/Dockerfile
+index cc06fc3..998f0ab 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -23,7 +23,7 @@ RUN apk add nodejs npm && npm install -g ajv-cli
+ RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
+ RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
+ 
+-VOLUME [ "/etc/sit-inbox", "/var/lib/repositories", "/var/run/oldmail" ]
++VOLUME [ "/etc/sit-inbox", "/var/lib/targets", "/var/run/oldmail" ]
+ 
+ ADD startup.sh /usr/bin/startup
+ ADD email-ingress /usr/bin/email-ingress
+diff --git a/README.md b/README.md
+index 973beb9..21bc47d 100644
+--- a/README.md
++++ b/README.md
+@@ -81,7 +81,7 @@ invoke operations such as mail retrieval.
+ An example configuration for a trivial setup will look something like:
+ 
+ ```toml
+-[repository.repo]
++[target.repo]
+ type = "git"
+ source = "https://username:password@host/repo.git"
+ git_username = "sit-inbox"
+@@ -93,7 +93,7 @@ retriever = "SimpleIMAPSSLRetriever"
+ server = "mail.server.com"
+ username = "inbox@server.com"
+ password = "password"
+-default_repository = "repo"
++default_target = "repo"
+ ```
+ 
+ Please refer to [schema.yaml](schema.yaml) for *almost-human-interpretable*
+diff --git a/email-ingress b/email-ingress
+index 2b7b81e..4d4a995 100755
+--- a/email-ingress
++++ b/email-ingress
+@@ -1,10 +1,10 @@
+ #! /usr/bin/env bash
+ 
+-repository=${1:-$REPOSITORY}
++target=${1:-$TARGET}
+ 
+ file=$(mktemp)
+ cat <&0 > "${file}"
+ 
+-cat "${file}" | setlock -n "/var/run/email.${repository}" "/usr/bin/email.${repository}" 2>&1
++cat "${file}" | setlock -n "/var/run/email.${target}" "/usr/bin/email.${target}" 2>&1
+ 
+ rm -f "${file}"
+diff --git a/playbook/playbook.yml b/playbook/playbook.yml
+index b0672d1..f27da91 100644
+--- a/playbook/playbook.yml
++++ b/playbook/playbook.yml
+@@ -65,32 +65,32 @@
+             when: item.value.type == "email"
+           - name: clone git repositories
+             git:
+-                    dest: "/var/lib/repositories/{{ item.key }}"
++                    dest: "/var/lib/targets/{{ item.key }}"
+                     repo: "{{ item.value.source }}"
+-            loop: "{{ repository | dict2items }}"
++            loop: "{{ target | dict2items }}"
+             when: item.value.type == "git"
+           - name: configure git repository username
+             git_config:
+                     name: user.name
+                     value: "{{ item.value.git_username | default('sit-inbox') }}"
+                     scope: local
+-                    repo: "/var/lib/repositories/{{ item.key }}"
+-            loop: "{{ repository | dict2items }}"
++                    repo: "/var/lib/targets/{{ item.key }}"
++            loop: "{{ target | dict2items }}"
+             when: item.value.type == "git"
+           - name: configure git repository email
+             git_config:
+                     name: user.email
+                     value: "{{ item.value.git_email | default('inbox@sit') }}"
+                     scope: local
+-                    repo: "/var/lib/repositories/{{ item.key }}"
+-            loop: "{{ repository | dict2items }}"
++                    repo: "/var/lib/targets/{{ item.key }}"
++            loop: "{{ target | dict2items }}"
+             when: item.value.type == "git"
+           - name: git ingress
+             template:
+                     src: templates/git_email.j2
+                     dest: "/usr/bin/email.{{ item.key }}"
+                     mode: 0700
+-            loop: "{{ repository | dict2items }}"
++            loop: "{{ target | dict2items }}"
+             when: item.value.type == "git"
+           - name: msmtp configuration
+             template:
+diff --git a/playbook/templates/getmail.j2 b/playbook/templates/getmail.j2
+index 8e3e513..710c90e 100644
+--- a/playbook/templates/getmail.j2
++++ b/playbook/templates/getmail.j2
+@@ -1,6 +1,6 @@
+ #! /usr/bin/env bash
+-{% if item.value.default_repository is defined -%}
+-export REPOSITORY={{ item.value.default_repository }}
++{% if item.value.default_target is defined -%}
++export TARGET={{ item.value.default_target }}
+ {% endif -%}
+ setlock "/var/run/getmail.{{ item.key }}" /usr/bin/getmail --rcfile="$HOME/.getmail/{{ item.key }}" \
+         --getmaildir=/var/run/oldmail -n
+diff --git a/playbook/templates/git_email.j2 b/playbook/templates/git_email.j2
+index 8678ca4..9ef0bfe 100644
+--- a/playbook/templates/git_email.j2
++++ b/playbook/templates/git_email.j2
+@@ -17,12 +17,12 @@ file=$(mktemp)
+ cat <&0 > "${file}"
+ temp=$(mktemp -d)
+ 
+-cd "/var/lib/repositories/{{ item.key }}"
++cd "/var/lib/targets/{{ item.key }}"
+ 
+ git pull -f -q 2>/dev/null
+ 
+ original="${temp}/original"
+-git clone -q "/var/lib/repositories/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
++git clone -q "/var/lib/targets/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
+ 
+ git branch -q -D inbox 2>/dev/null >/dev/null
+ git checkout -b inbox 2>/dev/null
+diff --git a/schema.yaml b/schema.yaml
+index 648ac94..2f37f8a 100644
+--- a/schema.yaml
++++ b/schema.yaml
+@@ -9,8 +9,8 @@ properties:
+         description: Inbox
+         allOf:
+         - properties:
+-            default_repository:
+-              description: By default, received updates will be routed to this repository
++            default_target:
++              description: By default, received updates will be routed to this target
+               type: string
+             type:
+               description: Inbox type
+@@ -102,17 +102,17 @@ properties:
+                 - path
+                 type: object
+     type: object
+-  repository:
+-    description: A dictionary of named repositories
++  target:
++    description: A dictionary of named targets
+     patternProperties:
+       '[a-zA-Z0-9\-_]+':
+         allOf:
+           - properties:
+                   source:
+-                          description: Master repository source (location)
++                          description: Master target source (location)
+                           type: string
+                   type:
+-                          description: Repository type
++                          description: Target type
+                           enum:
+                                   - git
+                           type: string
+diff --git a/sit-inbox b/sit-inbox
+index b6a7a1e..1908cf5 100755
+--- a/sit-inbox
++++ b/sit-inbox
+@@ -3,7 +3,7 @@
+ case "$1" in
+         new)
+                 mkdir -p "$2/etc"
+-                mkdir -p "$2/repositories"
++                mkdir -p "$2/targets"
+                 mkdir -p "$2/.oldmail"
+                 touch "$2/etc/config.toml"
+                 touch "$2/.dockerargs"
+@@ -17,7 +17,7 @@ case "$1" in
+                 docker_args=$(eval "echo $(cat "$(pwd)/$2/.dockerargs")")
+                 docker run \
+                         -v "$(pwd)/$2/etc:/etc/sit-inbox" \
+-                        -v "$(pwd)/$2/repositories:/var/lib/repositories" \
++                        -v "$(pwd)/$2/targets:/var/lib/targets" \
+                         -v "$(pwd)/$2/.oldmail:/var/run/oldmail" \
+                         ${docker_args} \
+                         -ti sit-inbox $3 
+diff --git a/tests/common.bash b/tests/common.bash
+index 19fa78d..a3fa7ef 100644
+--- a/tests/common.bash
++++ b/tests/common.bash
+@@ -1,9 +1,9 @@
+ reinit_repo () {
+   rm -rf $2
+   git clone --bare /repo $2
+-  cp /var/lib/repositories/$1/.git/config /tmp/config
+-  rm -rf /var/lib/repositories/$1
+-  git clone $2 /var/lib/repositories/$1
+-  mv /tmp/config /var/lib/repositories/$1/.git/config
++  cp /var/lib/targets/$1/.git/config /tmp/config
++  rm -rf /var/lib/targets/$1
++  git clone $2 /var/lib/targets/$1
++  mv /tmp/config /var/lib/targets/$1/.git/config
+ 
+ }
+diff --git a/tests/email.bats b/tests/email.bats
+index c993d24..58cd798 100644
+--- a/tests/email.bats
++++ b/tests/email.bats
+@@ -50,9 +50,8 @@ EOF
+   git config user.email special@test
+   git commit -m "correct patch"
+   git format-patch origin/master
+-  REPOSITORY=repo run maildrop -f special@test /root/.getmail/maildrop.email <*.patch
++  TARGET=repo run maildrop -f special@test /root/.getmail/maildrop.email <*.patch
+   rm -rf ${tmp}
+-  echo "${output}"
+   [ "$status" -eq 0 ]
+   [[ "${lines[0]}" =~ "From: test <special@test>" ]]
+   [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
+diff --git a/tests/fixtures/config.toml b/tests/fixtures/config.toml
+index c6a6eb3..c9eb5fa 100644
+--- a/tests/fixtures/config.toml
++++ b/tests/fixtures/config.toml
+@@ -1,11 +1,11 @@
+-[repository.repo]
++[target.repo]
+ type = "git"
+ source = "/repo.test"
+ email_response = true
+ email_from = "sit@inbox"
+ paths = ".sit subrepos/*/.sit ."
+ 
+-[repository.repo1]
++[target.repo1]
+ type = "git"
+ source = "/repo1.test"
+ 
+@@ -13,7 +13,7 @@ source = "/repo1.test"
+ type = "email"
+ retriever = "MailboxRetriever"
+ path = "/inbox"
+-default_repository = "repo"
++default_target = "repo"
+ maildrop = """
+ if ( /^From: test <special@test>/)
+ {
+-- 
+2.16.4
+

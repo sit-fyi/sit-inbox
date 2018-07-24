@@ -1,0 +1,18 @@
+In a variety of cases, we might have multiple
+repositories within one directory, or have
+them in non-standard locations.
+
+For example, a repository can be in the root.
+
+Alternatively, there might be a repository for
+defined per sub-directory.
+
+Solution: introduce repository.*.paths option
+that defaults to `.sit` but allows specifying
+multiple paths, and allows for wildcards.
+
+However, `repository.*` convention doesn't make a lot of sense anymore as it
+can contain multiple SIT repositories now. It's very confusing to have
+repositories with multiple repositories.
+
+Solution: rename `repository` to `target`

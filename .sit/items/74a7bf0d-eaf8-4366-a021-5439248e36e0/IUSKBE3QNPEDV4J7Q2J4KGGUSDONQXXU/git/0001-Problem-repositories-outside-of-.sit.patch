@@ -1,0 +1,253 @@
+From 7f3dbeeec5f441f787a9c595655d33d5191f4051 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Tue, 24 Jul 2018 17:45:18 +0700
+Subject: [PATCH 1/2] Problem: repositories outside of .sit
+
+In a variety of cases, we might have multiple
+repositories within one directory, or have
+them in non-standard locations.
+
+For example, a repository can be in the root.
+
+Alternatively, there might be a repository for
+defined per sub-directory.
+
+Solution: introduce repository.*.paths option
+that defaults to `.sit` but allows specifying
+multiple paths, and allows for wildcards.
+---
+ playbook/templates/git_email.j2 | 66 +++++++++++++++++++------------
+ schema.yaml                     |  4 ++
+ tests/fixtures/config.toml      |  1 +
+ tests/git-patch.bats            | 86 ++++++++++++++++++++++++++++++++++++++++-
+ 4 files changed, 132 insertions(+), 25 deletions(-)
+
+diff --git a/playbook/templates/git_email.j2 b/playbook/templates/git_email.j2
+index 0ee3ba1..8678ca4 100644
+--- a/playbook/templates/git_email.j2
++++ b/playbook/templates/git_email.j2
+@@ -32,40 +32,58 @@ cat ${file} | reformail -X Date: -X From: -X Subject: | \
+ git_am=$(git am -s -3 "${file}" 2>&1)
+ result=$?
+ 
++
++declare -a repo_paths=({{ item.value.paths | default('.sit') }})
++
+ if [ "${result}" == "0" ]; then
+         files=$(git diff --name-only origin/{{ item.value.branch | default('master') }} inbox)
+-        # Figure out if we're using .sit/items or deprecated .sit/issues
+-       if [ -d "/.sit/issues" ]; then
+-                target=issue
+-                target_dir=.sit/issues
+-        else
+-                target=item
+-                target_dir=.sit/items
+-        fi
+-        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+         outside_files=
+         for _file in ${files}; do
+-                if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+-                        outside_files="${outside_files}${_file} is outside of ${target_dir}\n"
+-                        continue
++                outside_files_=
++                target_found=""
++                for repo_path in "${repo_paths[@]}"; do
++                        target_dir=${repo_path}/items
++                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
++                        if [ "${target_dir:0:2}" == "./" ]; then
++                                target_dir=${target_dir:2:$target_dir_len}
++                                target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
++                        fi
++                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
++                                _outside_files="${_outside_files}${_file} is outside of ${target_dir}\n"
++                        else
++                                target_found=${target_dir}
++                                break
++                        fi
++                done
++                if [ "${target_found}" == "" ]; then
++                        outside_files="${outside_files}${_outside_files}"
+                 fi
++        done
++        for _file in ${files}; do
++                for repo_path in "${repo_paths[@]}"; do
++                        target_dir=${repo_path}/items
++                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+ 
+-                item=$(echo "${_file}" | cut -d'/' -f 3)
+-                record=$(echo "${_file}" | cut -d'/' -f 4)
+-                record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
++                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
++                                continue
++                        fi
+ 
+-                if [ -f "${original}/${_file}" ]; then
+-                        outside_files="${outside_files}File ${_file} already exists in the target repository\n"
+-                        continue
+-                fi
++                        item=$(echo "${_file}" | cut -d'/' -f 3)
++                        record=$(echo "${_file}" | cut -d'/' -f 4)
++                        record_path=$(echo "${_file}" | cut -d'/' -f 1-4)
+ 
+-                if [ -d "${original}/${record_path}" ]; then
+-                        if ! [[ "${outside_files}" =~ "Record ${item}/${record} already exists in the target repository" ]]; then
+-                                outside_files="${outside_files}Record ${item}/${record} already exists in the target repository\n"
++                        if [ -f "${original}/${_file}" ]; then
++                                outside_files="${outside_files}File ${_file} already exists in the target repository\n"
++                                continue
+                         fi
+-                        continue
+-                fi
+ 
++                        if [ -d "${original}/${record_path}" ]; then
++                                if ! [[ "${outside_files}" =~ "Record ${item}/${record} already exists in the target repository" ]]; then
++                                        outside_files="${outside_files}Record ${item}/${record} already exists in the target repository\n"
++                                fi
++                                continue
++                        fi
++                done
+         done
+         if [ "${outside_files}" == "" ]; then
+                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
+diff --git a/schema.yaml b/schema.yaml
+index 96572ba..648ac94 100644
+--- a/schema.yaml
++++ b/schema.yaml
+@@ -116,6 +116,10 @@ properties:
+                           enum:
+                                   - git
+                           type: string
++                  paths:
++                          description: Paths to SIT repositories (wildcards allowed)
++                          default: .sit
++                          type: string
+             required:
+                     - type
+                     - source
+diff --git a/tests/fixtures/config.toml b/tests/fixtures/config.toml
+index 1e843a8..c6a6eb3 100644
+--- a/tests/fixtures/config.toml
++++ b/tests/fixtures/config.toml
+@@ -3,6 +3,7 @@ type = "git"
+ source = "/repo.test"
+ email_response = true
+ email_from = "sit@inbox"
++paths = ".sit subrepos/*/.sit ."
+ 
+ [repository.repo1]
+ type = "git"
+diff --git a/tests/git-patch.bats b/tests/git-patch.bats
+index b267984..5a0387e 100644
+--- a/tests/git-patch.bats
++++ b/tests/git-patch.bats
+@@ -43,6 +43,82 @@ EOF
+   [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
+ }
+ 
++@test "git patch workflow: email with a correct patch for a top repo" {
++  tmp=$(mktemp -d)
++  git clone /repo.test "${tmp}/repo"
++  cd ${tmp}/repo
++  # TODO: since `sit init -u` not available in a release yet, work around it
++  mkdir _temp
++  cd _temp
++  sit init
++  cd ..
++  mv _temp/.sit/* .
++  rm -rf _temp
++  # Push it out to the target repo
++  git add config.json
++  git commit -m "init top"
++  git push /repo.test
++  #
++  item=$(sit -r . item)
++  sit -r . record -t Test ${item}
++  git add .
++  git commit -m "correct patch"
++  git format-patch HEAD^1..HEAD
++  run email.repo <*.patch
++  rm -rf ${tmp}
++  [ "$status" -eq 0 ]
++  [[ "${lines[0]}" =~ "From: test <test@test>" ]]
++  [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
++  [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
++  head=$(git -C /repo.test show HEAD)
++  [[ "${head}" =~ "correct patch" ]]
++  [[ "${head}" =~ "Signed-off-by: sit-inbox <inbox@sit>" ]]
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
++  [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
++}
++
++@test "git patch workflow: email with a correct patch for a sub repo" {
++  tmp=$(mktemp -d)
++  git clone /repo.test "${tmp}/repo"
++  cd ${tmp}/repo
++  # subrepos
++  mkdir -p subrepos/{sub1,sub2}
++  sit -d subrepos/sub1 init
++  sit -d subrepos/sub2 init
++  # Push it out to the target repo
++  git add subrepos
++  git commit -m "init subrepos"
++  git push /repo.test
++  #
++  item1=$(sit -d subrepos/sub1 item)
++  sit -d subrepos/sub1 record -t Test ${item1}
++  item2=$(sit -d subrepos/sub2 item)
++  sit -d subrepos/sub2 record -t Test ${item2}
++  git add subrepos
++  git commit -m "correct patch"
++  git format-patch HEAD^1..HEAD
++  run email.repo <*.patch
++  rm -rf ${tmp}
++  [ "$status" -eq 0 ]
++  [[ "${lines[0]}" =~ "From: test <test@test>" ]]
++  [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
++  [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
++  head=$(git -C /repo.test show HEAD)
++  [[ "${head}" =~ "correct patch" ]]
++  [[ "${head}" =~ "Signed-off-by: sit-inbox <inbox@sit>" ]]
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <test@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
++  [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
++}
++
++
+ @test "git patch workflow: email with a patch with a conflicting record" {
+   tmp=$(mktemp -d)
+   git clone /repo.test "${tmp}/repo"
+@@ -134,7 +210,11 @@ EOF
+   [[ "${lines[2]}" =~ "Subject: [PATCH] files outside" ]]
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+   [[ "${lines[4]}" =~ ".sit/a is outside of .sit/items" ]]
+-  [[ "${lines[5]}" =~ "a is outside of .sit/items" ]]
++  [[ "${lines[5]}" =~ ".sit/a is outside of subrepos" ]]
++  [[ "${lines[6]}" =~ ".sit/a is outside of items" ]]
++  [[ "${lines[7]}" =~ "a is outside of .sit/items" ]]
++  [[ "${lines[8]}" =~ "a is outside of subrepos" ]]
++  [[ "${lines[9]}" =~ "a is outside of items" ]]
+   run cat /root/sent
+   [ "$status" -eq 0 ]
+   [[ "${output}" =~ "From: sit@inbox" ]]
+@@ -142,7 +222,11 @@ EOF
+   [[ "${output}" =~ "Subject: Re: [PATCH] files outside" ]]
+   [[ "${output}" =~ "Please resolve the following issues" ]]
+   [[ "${output}" =~ ".sit/a is outside of .sit/items" ]]
++  [[ "${output}" =~ ".sit/a is outside of subrepos" ]]
++  [[ "${output}" =~ ".sit/a is outside of items" ]]
+   [[ "${output}" =~ "a is outside of .sit/items" ]]
++  [[ "${output}" =~ "a is outside of subrepos" ]]
++  [[ "${output}" =~ "a is outside of items" ]]
+ }
+ 
+ @test "git patch workflow: email with a conflicting patch" {
+-- 
+2.16.4
+
