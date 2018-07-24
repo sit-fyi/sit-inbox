@@ -17,12 +17,12 @@ file=$(mktemp)
 cat <&0 > "${file}"
 temp=$(mktemp -d)
 
-cd "/var/lib/repositories/{{ item.key }}"
+cd "/var/lib/targets/{{ item.key }}"
 
 git pull -f -q 2>/dev/null
 
 original="${temp}/original"
-git clone -q "/var/lib/repositories/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
+git clone -q "/var/lib/targets/{{ item.key }}" "${original}" 2>/dev/null 1>/dev/null
 
 git branch -q -D inbox 2>/dev/null >/dev/null
 git checkout -b inbox 2>/dev/null

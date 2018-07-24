@@ -3,7 +3,7 @@
 case "$1" in
         new)
                 mkdir -p "$2/etc"
-                mkdir -p "$2/repositories"
+                mkdir -p "$2/targets"
                 mkdir -p "$2/.oldmail"
                 touch "$2/etc/config.toml"
                 touch "$2/.dockerargs"
@@ -17,7 +17,7 @@ case "$1" in
                 docker_args=$(eval "echo $(cat "$(pwd)/$2/.dockerargs")")
                 docker run \
                         -v "$(pwd)/$2/etc:/etc/sit-inbox" \
-                        -v "$(pwd)/$2/repositories:/var/lib/repositories" \
+                        -v "$(pwd)/$2/targets:/var/lib/targets" \
                         -v "$(pwd)/$2/.oldmail:/var/run/oldmail" \
                         ${docker_args} \
                         -ti sit-inbox $3 

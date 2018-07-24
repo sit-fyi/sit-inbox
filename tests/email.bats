@@ -50,9 +50,8 @@ EOF
   git config user.email special@test
   git commit -m "correct patch"
   git format-patch origin/master
-  REPOSITORY=repo run maildrop -f special@test /root/.getmail/maildrop.email <*.patch
+  TARGET=repo run maildrop -f special@test /root/.getmail/maildrop.email <*.patch
   rm -rf ${tmp}
-  echo "${output}"
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" =~ "From: test <special@test>" ]]
   [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]

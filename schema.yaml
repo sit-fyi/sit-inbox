@@ -9,8 +9,8 @@ properties:
         description: Inbox
         allOf:
         - properties:
-            default_repository:
-              description: By default, received updates will be routed to this repository
+            default_target:
+              description: By default, received updates will be routed to this target
               type: string
             type:
               description: Inbox type
@@ -102,17 +102,17 @@ properties:
                 - path
                 type: object
     type: object
-  repository:
-    description: A dictionary of named repositories
+  target:
+    description: A dictionary of named targets
     patternProperties:
       '[a-zA-Z0-9\-_]+':
         allOf:
           - properties:
                   source:
-                          description: Master repository source (location)
+                          description: Master target source (location)
                           type: string
                   type:
-                          description: Repository type
+                          description: Target type
                           enum:
                                   - git
                           type: string

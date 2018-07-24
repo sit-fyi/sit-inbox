@@ -1,10 +1,10 @@
 #! /usr/bin/env bash
 
-repository=${1:-$REPOSITORY}
+target=${1:-$TARGET}
 
 file=$(mktemp)
 cat <&0 > "${file}"
 
-cat "${file}" | setlock -n "/var/run/email.${repository}" "/usr/bin/email.${repository}" 2>&1
+cat "${file}" | setlock -n "/var/run/email.${target}" "/usr/bin/email.${target}" 2>&1
 
 rm -f "${file}"

@@ -1,11 +1,11 @@
-[repository.repo]
+[target.repo]
 type = "git"
 source = "/repo.test"
 email_response = true
 email_from = "sit@inbox"
 paths = ".sit subrepos/*/.sit ."
 
-[repository.repo1]
+[target.repo1]
 type = "git"
 source = "/repo1.test"
 
@@ -13,7 +13,7 @@ source = "/repo1.test"
 type = "email"
 retriever = "MailboxRetriever"
 path = "/inbox"
-default_repository = "repo"
+default_target = "repo"
 maildrop = """
 if ( /^From: test <special@test>/)
 {

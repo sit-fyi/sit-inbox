@@ -1,6 +1,6 @@
 #! /usr/bin/env bash
-{% if item.value.default_repository is defined -%}
-export REPOSITORY={{ item.value.default_repository }}
+{% if item.value.default_target is defined -%}
+export TARGET={{ item.value.default_target }}
 {% endif -%}
 setlock "/var/run/getmail.{{ item.key }}" /usr/bin/getmail --rcfile="$HOME/.getmail/{{ item.key }}" \
         --getmaildir=/var/run/oldmail -n
