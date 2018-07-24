@@ -116,6 +116,10 @@ properties:
                           enum:
                                   - git
                           type: string
+                  paths:
+                          description: Paths to SIT repositories (wildcards allowed)
+                          default: .sit
+                          type: string
             required:
                     - type
                     - source

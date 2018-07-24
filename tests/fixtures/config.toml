@@ -3,6 +3,7 @@ type = "git"
 source = "/repo.test"
 email_response = true
 email_from = "sit@inbox"
+paths = ".sit subrepos/*/.sit ."
 
 [repository.repo1]
 type = "git"
