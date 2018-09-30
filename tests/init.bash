@@ -10,6 +10,8 @@ if ! [ -f /.initialized ]; then
   sit init
   git add .sit
   git commit -m "init"
+  git checkout -b test-branch
+  git checkout master
   cd ..
   git clone --bare /repo /repo.test
   git clone --bare /repo /repo1.test
