@@ -5,6 +5,14 @@ email_response = true
 email_from = "sit@inbox"
 paths = ".sit subrepos/*/.sit ."
 
+[target.repo-branch]
+type = "git"
+source = "/repo.test"
+branch = "test-branch"
+email_response = true
+email_from = "sit@inbox"
+paths = ".sit subrepos/*/.sit ."
+
 [target.repo1]
 type = "git"
 source = "/repo1.test"

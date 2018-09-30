@@ -43,6 +43,34 @@ EOF
   [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
 }
 
+@test "git patch workflow: email with a correct patch for a branch" {
+  tmp=$(mktemp -d)
+  git clone /repo.test "${tmp}/repo"
+  cd ${tmp}/repo
+  item=$(sit item)
+  sit record -t Test ${item}
+  git config user.email branch@test
+  git add .sit
+  git commit -m "correct patch"
+  git format-patch origin/master
+  run email.repo-branch <*.patch
+  rm -rf ${tmp}
+  [ "$status" -eq 0 ]
+  [[ "${lines[0]}" =~ "From: test <branch@test>" ]]
+  [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
+  [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
+  head=$(git -C /repo.test show test-branch)
+  [[ "${head}" =~ "correct patch" ]]
+  [[ "${head}" =~ "Signed-off-by: sit-inbox <inbox@sit>" ]]
+  run cat /root/sent
+  [ "$status" -eq 0 ]
+  [[ "${output}" =~ "From: sit@inbox" ]]
+  [[ "${output}" =~ "To: test <branch@test>" ]]
+  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
+  [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
+}
+
+
 @test "git patch workflow: email with a correct patch for a top repo" {
   tmp=$(mktemp -d)
   git clone /repo.test "${tmp}/repo"
