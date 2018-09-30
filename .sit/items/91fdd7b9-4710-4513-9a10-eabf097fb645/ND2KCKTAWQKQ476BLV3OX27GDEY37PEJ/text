@@ -1,0 +1,5 @@
+There is no way to be sure sit-inbox will handle branches in target
+repositories well.
+
+Solution: write a minimal test
+

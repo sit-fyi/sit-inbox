@@ -1,0 +1,89 @@
+From 067dbb8d7db06eb8bee7a843cd91a9b4377cf9dc Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Sun, 30 Sep 2018 12:10:01 -0700
+Subject: [PATCH] Problem: inboxing for a branch
+
+There is no way to be sure sit-inbox will handle branches in target
+repositories well.
+
+Solution: write a minimal test
+---
+ tests/fixtures/config.toml |  8 ++++++++
+ tests/git-patch.bats       | 28 ++++++++++++++++++++++++++++
+ tests/init.bash            |  2 ++
+ 3 files changed, 38 insertions(+)
+
+diff --git a/tests/fixtures/config.toml b/tests/fixtures/config.toml
+index c9eb5fa..6ec56b2 100644
+--- a/tests/fixtures/config.toml
++++ b/tests/fixtures/config.toml
+@@ -5,6 +5,14 @@ email_response = true
+ email_from = "sit@inbox"
+ paths = ".sit subrepos/*/.sit ."
+ 
++[target.repo-branch]
++type = "git"
++source = "/repo.test"
++branch = "test-branch"
++email_response = true
++email_from = "sit@inbox"
++paths = ".sit subrepos/*/.sit ."
++
+ [target.repo1]
+ type = "git"
+ source = "/repo1.test"
+diff --git a/tests/git-patch.bats b/tests/git-patch.bats
+index 5a0387e..a7474ce 100644
+--- a/tests/git-patch.bats
++++ b/tests/git-patch.bats
+@@ -43,6 +43,34 @@ EOF
+   [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
+ }
+ 
++@test "git patch workflow: email with a correct patch for a branch" {
++  tmp=$(mktemp -d)
++  git clone /repo.test "${tmp}/repo"
++  cd ${tmp}/repo
++  item=$(sit item)
++  sit record -t Test ${item}
++  git config user.email branch@test
++  git add .sit
++  git commit -m "correct patch"
++  git format-patch origin/master
++  run email.repo-branch <*.patch
++  rm -rf ${tmp}
++  [ "$status" -eq 0 ]
++  [[ "${lines[0]}" =~ "From: test <branch@test>" ]]
++  [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
++  [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
++  head=$(git -C /repo.test show test-branch)
++  [[ "${head}" =~ "correct patch" ]]
++  [[ "${head}" =~ "Signed-off-by: sit-inbox <inbox@sit>" ]]
++  run cat /root/sent
++  [ "$status" -eq 0 ]
++  [[ "${output}" =~ "From: sit@inbox" ]]
++  [[ "${output}" =~ "To: test <branch@test>" ]]
++  [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
++  [[ "${output}" =~ "It has been successfully pushed to the master repository" ]]
++}
++
++
+ @test "git patch workflow: email with a correct patch for a top repo" {
+   tmp=$(mktemp -d)
+   git clone /repo.test "${tmp}/repo"
+diff --git a/tests/init.bash b/tests/init.bash
+index 09e5905..4252877 100644
+--- a/tests/init.bash
++++ b/tests/init.bash
+@@ -10,6 +10,8 @@ if ! [ -f /.initialized ]; then
+   sit init
+   git add .sit
+   git commit -m "init"
++  git checkout -b test-branch
++  git checkout master
+   cd ..
+   git clone --bare /repo /repo.test
+   git clone --bare /repo /repo1.test
+-- 
+2.16.4
+
