@@ -1,3 +1,6 @@
 [submodule ".sit/modules/issue-tracking"]
 	path = .sit/modules/issue-tracking
 	url = https://github.com/sit-it/issue-tracking.git
+[submodule "sit"]
+	path = sit
+	url = https://github.com/sit-fyi/sit.git

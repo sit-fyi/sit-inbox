@@ -31,6 +31,7 @@ EOF
   [ "$status" -eq 0 ]
   [[ "${lines[0]}" =~ "From: test <test@test>" ]]
   [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
+  echo "${lines[3]}" >&1
   [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
   head=$(git -C /repo.test show HEAD)
   [[ "${head}" =~ "correct patch" ]]
@@ -164,22 +165,36 @@ EOF
   tmp=$(mktemp -d)
   git clone /repo.test "${tmp}/repo"
   cd ${tmp}/repo
-  touch ".sit/items/${item}/${record}/test"
-  git add ".sit/items/${item}/${record}/test"
+  if [ -d ".sit/items/${item}/${record}" ]; then
+      touch ".sit/items/${item}/${record}/test"
+      git add ".sit/items/${item}/${record}/test"
+  else
+      touch `pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`/test
+      git add `pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`/test
+  fi 
   git commit -m "updated"
   git format-patch origin/master
   run email.repo <*.patch
   [ "$status" -eq 0 ]
+  echo "$output"
   [[ "${lines[3]}" =~ "Patch rejected" ]]
-  [[ "${lines[4]}" =~ "Record ${item}/${record} already exists in the target repository" ]]
-  rm -rf "${tmp}"
+  if [ -d ".sit/items/${item}/${record}" ]; then
+      [[ "${lines[4]}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+  else
+      [[ "${lines[4]}" =~ "Record ${record} already exists in the target repository" ]]
+  fi
   run cat /root/sent
   [ "$status" -eq 0 ]
   [[ "${output}" =~ "From: sit@inbox" ]]
   [[ "${output}" =~ "To: test <test@test>" ]]
   [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
   [[ "${output}" =~ "Please resolve the following issues" ]]
-  [[ "${output}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+  if [ -d ".sit/items/${item}/${record}" ]; then
+      [[ "${output}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+  else
+      [[ "${output}" =~ "Record ${record} already exists in the target repository" ]]
+  fi
+  rm -rf "${tmp}"
 }
 
 @test "git patch workflow: email with a patch manipulating existing files" {
@@ -199,16 +214,23 @@ EOF
   tmp=$(mktemp -d)
   git clone /repo.test "${tmp}/repo"
   cd ${tmp}/repo
-  git rm ".sit/items/${item}/${record}/.type/Test"
-  echo "new authors" > ".sit/items/${item}/${record}/.authors"
-  git add ".sit/items/${item}/${record}"
+  if [ -d ".sit/items/${item}/${record}" ]; then
+      git rm ".sit/items/${item}/${record}/.type/Test"
+      echo "new authors" > ".sit/items/${item}/${record}/.authors"
+      git add ".sit/items/${item}/${record}"
+  else
+      _path=`pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`
+      git rm "${_path}/.type/Test"
+      echo "new authors" > "${_path}/.authors"
+      git add ".sit/records"
+  fi
   git commit -m "updated"
   git format-patch origin/master
   run email.repo <*.patch
   [ "$status" -eq 0 ]
   [[ "${lines[3]}" =~ "Patch rejected" ]]
-  [[ "${lines[4]}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
-  [[ "${lines[5]}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
+  [[ "${lines[4]}" =~ "${record}/.authors already exists in the target repository" ]]
+  [[ "${lines[5]}" =~ "${record}/.type/Test already exists in the target repository" ]]
   rm -rf "${tmp}"
   run cat /root/sent
   [ "$status" -eq 0 ]
@@ -216,11 +238,11 @@ EOF
   [[ "${output}" =~ "To: test <test@test>" ]]
   [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
   [[ "${output}" =~ "Please resolve the following issues" ]]
-  [[ "${output}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
-  [[ "${output}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
+  [[ "${output}" =~ "${record}/.authors already exists in the target repository" ]]
+  [[ "${output}" =~ "${record}/.type/Test already exists in the target repository" ]]
 }
 
-@test "git patch workflow: email with a patch with files outside of .sit/items" {
+@test "git patch workflow: email with a patch with files outside of record storage" {
   tmp=$(mktemp -d)
   git clone /repo.test "${tmp}/repo"
   cd ${tmp}/repo
@@ -269,20 +291,30 @@ EOF
   git commit -m "correct patch"
   git format-patch origin/master
   run email.repo <*.patch
-  rm -rf ${tmp}
   [ "$status" -eq 0 ]
   # Now, try to simulate a conflict
   cd "${tmp0}/repo"
-  mkdir -p .sit/items/${item}/${record}
-  echo test > .sit/items/${item}/${record}/.timestamp
+  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
+      mkdir -p .sit/items/${item}/${record}
+      echo test > .sit/items/${item}/${record}/.timestamp
+  else
+      _path=.sit/items/${item}/`cat "${tmp}/repo/.sit/items/${item}/${record}"`
+      mkdir -p ${_path}
+      echo test > ${_path}/.timestamp
+      _path=`realpath ${_path} --relative-to=.`
+  fi
   git add .sit
   git commit -m "correct patch"
   git format-patch origin/master
   run email.repo <*.patch
-  rm -rf ${tmp}
   [ "$status" -eq 0 ]
   [[ "${lines[3]}" =~ "Patch rejected" ]]
-  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
+
+  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
+      [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
+  else
+      [[ "${output}" =~ "Merge conflict in ${_path}/.timestamp" ]]
+  fi
 
   run cat /root/sent
   [ "$status" -eq 0 ]
@@ -290,6 +322,11 @@ EOF
   [[ "${output}" =~ "To: test <test@test>" ]]
   [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
   [[ "${output}" =~ "Please resolve the following issue" ]]
-  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
+  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
+      [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
+  else
+      [[ "${output}" =~ "Merge conflict in ${_path}/.timestamp" ]]
+  fi
+  rm -rf ${tmp} ${tmp0}
 }
 

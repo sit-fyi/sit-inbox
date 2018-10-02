@@ -18,10 +18,14 @@ RUN apk add py-pip && pip install -e git+https://github.com/dbohdan/remarshal@v0
 RUN apk add bash coreutils msmtp dovecot shadow dialog ncurses util-linux
 RUN git clone https://github.com/bats-core/bats-core && \
     cd bats-core && git checkout v1.1.0 && ./install.sh /usr/local && cd .. && rm -rf bats-core
-RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
 RUN apk add nodejs npm && npm install -g ajv-cli
 RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
+# Stable SIT
+RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
 RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
+# Last known master
+RUN mkdir -p /root/.sit-install/master
+COPY sit/target/x86_64-unknown-linux-musl/release/sit /root/.sit-install/master/
 
 VOLUME [ "/etc/sit-inbox", "/var/lib/targets", "/var/run/oldmail" ]
 
