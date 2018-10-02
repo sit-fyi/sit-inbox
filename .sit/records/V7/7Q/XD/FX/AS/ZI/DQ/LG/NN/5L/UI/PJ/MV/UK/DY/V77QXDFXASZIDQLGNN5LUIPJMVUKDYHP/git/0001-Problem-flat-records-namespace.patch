@@ -1,0 +1,308 @@
+From 649073e6f4191bd3d9e61a1872a0841a5046cc46 Mon Sep 17 00:00:00 2001
+From: Yurii Rashkovskii <me@yrashk.com>
+Date: Mon, 1 Oct 2018 19:15:22 -0700
+Subject: [PATCH] Problem: flat records namespace
+
+New version of sit is switching to the flat records namespace
+(.sit/records) which sit-inbox does not support.
+
+Solution: make sure both the old and the new styles are supported
+
+For the meantime this means that sit-inbox is tested against both latest
+stable and "last known master" and the code has been adjusted to support
+both layouts.
+---
+ .gitmodules                     |  3 ++
+ Dockerfile                      |  6 +++-
+ Makefile                        | 15 +++++++--
+ playbook/templates/git_email.j2 | 40 ++++++++++++++++++++--
+ sit                             |  1 +
+ tests/git-patch.bats            | 75 ++++++++++++++++++++++++++++++-----------
+ 6 files changed, 114 insertions(+), 26 deletions(-)
+ create mode 160000 sit
+
+diff --git a/.gitmodules b/.gitmodules
+index 18bd24a..7179df7 100644
+--- a/.gitmodules
++++ b/.gitmodules
+@@ -1,3 +1,6 @@
+ [submodule ".sit/modules/issue-tracking"]
+ 	path = .sit/modules/issue-tracking
+ 	url = https://github.com/sit-it/issue-tracking.git
++[submodule "sit"]
++	path = sit
++	url = https://github.com/sit-fyi/sit.git
+diff --git a/Dockerfile b/Dockerfile
+index 998f0ab..04955ff 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -18,10 +18,14 @@ RUN apk add py-pip && pip install -e git+https://github.com/dbohdan/remarshal@v0
+ RUN apk add bash coreutils msmtp dovecot shadow dialog ncurses util-linux
+ RUN git clone https://github.com/bats-core/bats-core && \
+     cd bats-core && git checkout v1.1.0 && ./install.sh /usr/local && cd .. && rm -rf bats-core
+-RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
+ RUN apk add nodejs npm && npm install -g ajv-cli
+ RUN ln -sf /usr/bin/msmtp /usr/sbin/sendmail
++# Stable SIT
++RUN apk add curl && curl -s https://sit.fyi/install.sh | sh
+ RUN echo "export PATH=/root/.sit-install:\$PATH" >> /root/.bashrc
++# Last known master
++RUN mkdir -p /root/.sit-install/master
++COPY sit/target/x86_64-unknown-linux-musl/release/sit /root/.sit-install/master/
+ 
+ VOLUME [ "/etc/sit-inbox", "/var/lib/targets", "/var/run/oldmail" ]
+ 
+diff --git a/Makefile b/Makefile
+index 800c8ae..90d3e85 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,9 +1,18 @@
+-all:
++all: sit/target/x86_64-unknown-linux-musl/release/sit
+ 	docker build -t sit-inbox .
+ 
+-test:
+-	docker build -qt sit-inbox-test .
++sit/target/x86_64-unknown-linux-musl/release/sit: $(wildcard sit/**/*.rs) 
++	git submodule update --init
++	docker build -t sit-inbox-test-build-container sit/build-tools/linux-build-container
++	docker run -v $(shell pwd)/sit:/sit -w /sit sit-inbox-test-build-container cargo build --release --target=x86_64-unknown-linux-musl
++
++test: sit/target/x86_64-unknown-linux-musl/release/sit
++	docker build -t sit-inbox-test .
++	@echo "======[ sit: release ]"
+ 	docker run -v $(shell pwd)/tests:/tests -ti sit-inbox-test bash -ic "source /tests/init.bash && bats /tests"
++	@echo "======[ sit: master ]"
++	docker run -v $(shell pwd)/tests:/tests -ti sit-inbox-test bash -ic "cp /root/.sit-install/master/sit /root/.sit-install/ && source /tests/init.bash && bats /tests"
++
+ 
+ install:
+ 	mkdir -p /usr/local/bin
+diff --git a/playbook/templates/git_email.j2 b/playbook/templates/git_email.j2
+index 9ef0bfe..af59f97 100644
+--- a/playbook/templates/git_email.j2
++++ b/playbook/templates/git_email.j2
+@@ -44,12 +44,18 @@ if [ "${result}" == "0" ]; then
+                 for repo_path in "${repo_paths[@]}"; do
+                         target_dir=${repo_path}/items
+                         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
++                        target_dir_records=${repo_path}/records
++                        target_dir_records_len=$(echo -n $target_dir_records | wc -m) # not using bash string length to avoid clashing with template syntax
+                         if [ "${target_dir:0:2}" == "./" ]; then
+                                 target_dir=${target_dir:2:$target_dir_len}
+                                 target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
++                                target_dir_records=${target_dir_records:2:$target_dir_records_len}
++                                target_dir_records_len=$(echo -n $target_dir_records | wc -m) # not using bash string length to avoid clashing with template syntax
++
+                         fi
+-                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+-                                _outside_files="${_outside_files}${_file} is outside of ${target_dir}\n"
++                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" -a \
++                             "${_file:0:${target_dir_records_len}}" != "${target_dir_records}" ]; then
++                                _outside_files="${_outside_files}${_file} is outside of ${target_dir} or ${target_dir_records}\n"
+                         else
+                                 target_found=${target_dir}
+                                 break
+@@ -63,7 +69,7 @@ if [ "${result}" == "0" ]; then
+                 for repo_path in "${repo_paths[@]}"; do
+                         target_dir=${repo_path}/items
+                         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+-
++ 
+                         if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                                 continue
+                         fi
+@@ -83,8 +89,36 @@ if [ "${result}" == "0" ]; then
+                                 fi
+                                 continue
+                         fi
++ 
++                done
++        done
++        for _file in ${files}; do
++                for repo_path in "${repo_paths[@]}"; do
++                        target_dir=${repo_path}/records
++                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
++
++                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
++                                continue
++                        fi
++
++                        record=$(echo "${_file}" | cut -d'/' -f 18)
++                        record_path=$(echo "${_file}" | cut -d'/' -f 1-18)
++
++                        if [ -f "${original}/${_file}" ]; then
++                                outside_files="${outside_files}File ${_file} already exists in the target repository\n"
++                                continue
++                        fi
++
++                        if [ -d "${original}/${record_path}" ]; then
++                                if ! [[ "${outside_files}" =~ "Record ${record} already exists in the target repository" ]]; then
++                                        outside_files="${outside_files}Record ${record} already exists in the target repository\n"
++                                fi
++                                continue
++                        fi
++ 
+                 done
+         done
++ 
+         if [ "${outside_files}" == "" ]; then
+                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
+                 logger -s -t "git.{{ item.key }}" "Patch applied and pushed"
+diff --git a/sit b/sit
+new file mode 160000
+index 0000000..36c2986
+--- /dev/null
++++ b/sit
+@@ -0,0 +1 @@
++Subproject commit 36c29862bf8f9f304c254230c57f57c9619279b6
+diff --git a/tests/git-patch.bats b/tests/git-patch.bats
+index a7474ce..23e2fe8 100644
+--- a/tests/git-patch.bats
++++ b/tests/git-patch.bats
+@@ -31,6 +31,7 @@ EOF
+   [ "$status" -eq 0 ]
+   [[ "${lines[0]}" =~ "From: test <test@test>" ]]
+   [[ "${lines[2]}" =~ "Subject: [PATCH] correct patch" ]]
++  echo "${lines[3]}" >&1
+   [[ "${lines[3]}" =~ "Patch applied and pushed" ]]
+   head=$(git -C /repo.test show HEAD)
+   [[ "${head}" =~ "correct patch" ]]
+@@ -164,22 +165,36 @@ EOF
+   tmp=$(mktemp -d)
+   git clone /repo.test "${tmp}/repo"
+   cd ${tmp}/repo
+-  touch ".sit/items/${item}/${record}/test"
+-  git add ".sit/items/${item}/${record}/test"
++  if [ -d ".sit/items/${item}/${record}" ]; then
++      touch ".sit/items/${item}/${record}/test"
++      git add ".sit/items/${item}/${record}/test"
++  else
++      touch `pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`/test
++      git add `pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`/test
++  fi 
+   git commit -m "updated"
+   git format-patch origin/master
+   run email.repo <*.patch
+   [ "$status" -eq 0 ]
++  echo "$output"
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+-  [[ "${lines[4]}" =~ "Record ${item}/${record} already exists in the target repository" ]]
+-  rm -rf "${tmp}"
++  if [ -d ".sit/items/${item}/${record}" ]; then
++      [[ "${lines[4]}" =~ "Record ${item}/${record} already exists in the target repository" ]]
++  else
++      [[ "${lines[4]}" =~ "Record ${record} already exists in the target repository" ]]
++  fi
+   run cat /root/sent
+   [ "$status" -eq 0 ]
+   [[ "${output}" =~ "From: sit@inbox" ]]
+   [[ "${output}" =~ "To: test <test@test>" ]]
+   [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
+   [[ "${output}" =~ "Please resolve the following issues" ]]
+-  [[ "${output}" =~ "Record ${item}/${record} already exists in the target repository" ]]
++  if [ -d ".sit/items/${item}/${record}" ]; then
++      [[ "${output}" =~ "Record ${item}/${record} already exists in the target repository" ]]
++  else
++      [[ "${output}" =~ "Record ${record} already exists in the target repository" ]]
++  fi
++  rm -rf "${tmp}"
+ }
+ 
+ @test "git patch workflow: email with a patch manipulating existing files" {
+@@ -199,16 +214,23 @@ EOF
+   tmp=$(mktemp -d)
+   git clone /repo.test "${tmp}/repo"
+   cd ${tmp}/repo
+-  git rm ".sit/items/${item}/${record}/.type/Test"
+-  echo "new authors" > ".sit/items/${item}/${record}/.authors"
+-  git add ".sit/items/${item}/${record}"
++  if [ -d ".sit/items/${item}/${record}" ]; then
++      git rm ".sit/items/${item}/${record}/.type/Test"
++      echo "new authors" > ".sit/items/${item}/${record}/.authors"
++      git add ".sit/items/${item}/${record}"
++  else
++      _path=`pwd`/.sit/items/${item}/`cat ".sit/items/${item}/${record}"`
++      git rm "${_path}/.type/Test"
++      echo "new authors" > "${_path}/.authors"
++      git add ".sit/records"
++  fi
+   git commit -m "updated"
+   git format-patch origin/master
+   run email.repo <*.patch
+   [ "$status" -eq 0 ]
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+-  [[ "${lines[4]}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
+-  [[ "${lines[5]}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
++  [[ "${lines[4]}" =~ "${record}/.authors already exists in the target repository" ]]
++  [[ "${lines[5]}" =~ "${record}/.type/Test already exists in the target repository" ]]
+   rm -rf "${tmp}"
+   run cat /root/sent
+   [ "$status" -eq 0 ]
+@@ -216,11 +238,11 @@ EOF
+   [[ "${output}" =~ "To: test <test@test>" ]]
+   [[ "${output}" =~ "Subject: Re: [PATCH] updated" ]]
+   [[ "${output}" =~ "Please resolve the following issues" ]]
+-  [[ "${output}" =~ "File .sit/items/${item}/${record}/.authors already exists in the target repository" ]]
+-  [[ "${output}" =~ "File .sit/items/${item}/${record}/.type/Test already exists in the target repository" ]]
++  [[ "${output}" =~ "${record}/.authors already exists in the target repository" ]]
++  [[ "${output}" =~ "${record}/.type/Test already exists in the target repository" ]]
+ }
+ 
+-@test "git patch workflow: email with a patch with files outside of .sit/items" {
++@test "git patch workflow: email with a patch with files outside of record storage" {
+   tmp=$(mktemp -d)
+   git clone /repo.test "${tmp}/repo"
+   cd ${tmp}/repo
+@@ -269,20 +291,30 @@ EOF
+   git commit -m "correct patch"
+   git format-patch origin/master
+   run email.repo <*.patch
+-  rm -rf ${tmp}
+   [ "$status" -eq 0 ]
+   # Now, try to simulate a conflict
+   cd "${tmp0}/repo"
+-  mkdir -p .sit/items/${item}/${record}
+-  echo test > .sit/items/${item}/${record}/.timestamp
++  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
++      mkdir -p .sit/items/${item}/${record}
++      echo test > .sit/items/${item}/${record}/.timestamp
++  else
++      _path=.sit/items/${item}/`cat "${tmp}/repo/.sit/items/${item}/${record}"`
++      mkdir -p ${_path}
++      echo test > ${_path}/.timestamp
++      _path=`realpath ${_path} --relative-to=.`
++  fi
+   git add .sit
+   git commit -m "correct patch"
+   git format-patch origin/master
+   run email.repo <*.patch
+-  rm -rf ${tmp}
+   [ "$status" -eq 0 ]
+   [[ "${lines[3]}" =~ "Patch rejected" ]]
+-  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++
++  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
++      [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++  else
++      [[ "${output}" =~ "Merge conflict in ${_path}/.timestamp" ]]
++  fi
+ 
+   run cat /root/sent
+   [ "$status" -eq 0 ]
+@@ -290,6 +322,11 @@ EOF
+   [[ "${output}" =~ "To: test <test@test>" ]]
+   [[ "${output}" =~ "Subject: Re: [PATCH] correct patch" ]]
+   [[ "${output}" =~ "Please resolve the following issue" ]]
+-  [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++  if [ -d "${tmp}/repo/.sit/items/${item}/${record}" ]; then
++      [[ "${output}" =~ "Merge conflict in .sit/items/${item}/${record}/.timestamp" ]]
++  else
++      [[ "${output}" =~ "Merge conflict in ${_path}/.timestamp" ]]
++  fi
++  rm -rf ${tmp} ${tmp0}
+ }
+ 
+-- 
+2.16.4
+

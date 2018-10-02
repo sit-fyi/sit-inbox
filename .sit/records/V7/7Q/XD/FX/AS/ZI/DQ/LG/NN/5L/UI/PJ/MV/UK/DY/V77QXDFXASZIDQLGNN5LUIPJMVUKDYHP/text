@@ -1,0 +1,9 @@
+New version of sit is switching to the flat records namespace
+(.sit/records) which sit-inbox does not support.
+
+Solution: make sure both the old and the new styles are supported
+
+For the meantime this means that sit-inbox is tested against both latest
+stable and "last known master" and the code has been adjusted to support
+both layouts.
+
