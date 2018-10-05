@@ -1,0 +1,7 @@
+Currently, when getmail is interrupted (terminated) while still downloading messages, it'll not remember that it has processed messages before the crash and will attempt to re-download them.
+
+My hunch is that it doesn't save `oldmail` until its down.
+
+Proposed solution 1:  patch getmail to make it save oldmail after every message.
+
+Proposed solution 2: record message identifiers of already processed messages so that they can be skipped if attempted again (upon success of `email-ingress`?)
