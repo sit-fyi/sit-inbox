@@ -44,12 +44,18 @@ if [ "${result}" == "0" ]; then
                 for repo_path in "${repo_paths[@]}"; do
                         target_dir=${repo_path}/items
                         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+                        target_dir_records=${repo_path}/records
+                        target_dir_records_len=$(echo -n $target_dir_records | wc -m) # not using bash string length to avoid clashing with template syntax
                         if [ "${target_dir:0:2}" == "./" ]; then
                                 target_dir=${target_dir:2:$target_dir_len}
                                 target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+                                target_dir_records=${target_dir_records:2:$target_dir_records_len}
+                                target_dir_records_len=$(echo -n $target_dir_records | wc -m) # not using bash string length to avoid clashing with template syntax
+
                         fi
-                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
-                                _outside_files="${_outside_files}${_file} is outside of ${target_dir}\n"
+                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" -a \
+                             "${_file:0:${target_dir_records_len}}" != "${target_dir_records}" ]; then
+                                _outside_files="${_outside_files}${_file} is outside of ${target_dir} or ${target_dir_records}\n"
                         else
                                 target_found=${target_dir}
                                 break
@@ -63,7 +69,7 @@ if [ "${result}" == "0" ]; then
                 for repo_path in "${repo_paths[@]}"; do
                         target_dir=${repo_path}/items
                         target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
-
+ 
                         if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
                                 continue
                         fi
@@ -83,8 +89,36 @@ if [ "${result}" == "0" ]; then
                                 fi
                                 continue
                         fi
+ 
                 done
         done
+        for _file in ${files}; do
+                for repo_path in "${repo_paths[@]}"; do
+                        target_dir=${repo_path}/records
+                        target_dir_len=$(echo -n $target_dir | wc -m) # not using bash string length to avoid clashing with template syntax
+
+                        if [ "${_file:0:${target_dir_len}}" != "${target_dir}" ]; then
+                                continue
+                        fi
+
+                        record=$(echo "${_file}" | cut -d'/' -f 18)
+                        record_path=$(echo "${_file}" | cut -d'/' -f 1-18)
+
+                        if [ -f "${original}/${_file}" ]; then
+                                outside_files="${outside_files}File ${_file} already exists in the target repository\n"
+                                continue
+                        fi
+
+                        if [ -d "${original}/${record_path}" ]; then
+                                if ! [[ "${outside_files}" =~ "Record ${record} already exists in the target repository" ]]; then
+                                        outside_files="${outside_files}Record ${record} already exists in the target repository\n"
+                                fi
+                                continue
+                        fi
+ 
+                done
+        done
+ 
         if [ "${outside_files}" == "" ]; then
                 git push "{{ item.value.source }}" "inbox:{{ item.value.branch | default('master') }}" 2>/dev/null
                 logger -s -t "git.{{ item.key }}" "Patch applied and pushed"
